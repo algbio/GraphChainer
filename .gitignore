@@ -1,3 +1,4 @@
-.idea/
-cmake-build-debug/
-build/
+obj/*
+bin/*
+src/vg.pb.cc
+src/vg.pb.h
