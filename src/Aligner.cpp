@@ -19,6 +19,8 @@
 #include "MinimizerSeeder.h"
 #include "AlignmentSelection.h"
 
+#include <edlib.h>
+
 struct Seeder
 {
 	enum Mode
@@ -371,6 +373,91 @@ void writeCorrectedClippedToQueue(moodycamel::ProducerToken& token, const Aligne
 	QueueInsertSlowly(token, correctedClippedOut, strstr.str());
 }
 
+std::vector<AlignmentGraph::MatrixPosition> traceToPoses(const AlignmentGraph& alignmentGraph, AlignmentResult::AlignmentItem &aln) {
+	std::vector<AlignmentGraph::MatrixPosition> ret;
+	auto trace = aln.trace->trace;
+	size_t lastNode, lastOffset, lastLength;
+	for (size_t j = 0; j < trace.size(); j++) {
+		AlignmentGraph::MatrixPosition p = trace[j].DPposition;
+		p.node = alignmentGraph.GetUnitigNode(p.node, p.nodeOffset);
+		p.nodeOffset -= alignmentGraph.NodeOffset(p.node);
+		if (j == 0) {
+			lastNode = p.node;
+			lastOffset = p.nodeOffset;
+			lastLength = alignmentGraph.NodeLength(p.node);
+			ret.emplace_back(lastNode, lastOffset, 0);
+			lastOffset++;
+		}
+		else {
+			if (p.node != lastNode) {
+				while (lastOffset < lastLength) {
+					ret.emplace_back(lastNode, lastOffset, 0);
+					lastOffset++;
+				}
+				lastNode = p.node;
+				lastLength = alignmentGraph.NodeLength(p.node);
+				lastOffset = 0;
+			}
+			while (lastOffset <= p.nodeOffset) {
+				ret.emplace_back(lastNode, lastOffset, 0);
+				lastOffset++;
+			}
+		}
+	}
+	return ret;
+}
+std::vector<AlignmentGraph::MatrixPosition> pathToTrace(const AlignmentGraph& alignmentGraph, const std::vector<size_t> &path, size_t firstNodeOffset, size_t lastNodeOffset) {
+	std::vector<AlignmentGraph::MatrixPosition> ret;
+	for (size_t node : path) {
+		size_t S = 0, L = alignmentGraph.NodeLength(node);
+		if (node == path[0])
+			S = firstNodeOffset;
+		else if (node == path.back())
+			L = lastNodeOffset + 1;
+		AlignmentGraph::MatrixPosition p(node, S, 0);
+		while (p.nodeOffset < L) {
+			ret.push_back(p);
+			p.nodeOffset++;
+		}
+	}
+	return ret;
+}
+std::string traceToSequence(const AlignmentGraph& alignmentGraph, AlignmentResult::AlignmentItem &aln) {
+	std::string ret = "";
+	for (const AlignmentGraph::MatrixPosition &p : traceToPoses(alignmentGraph, aln)) 
+		ret.push_back(alignmentGraph.NodeSequences(p.node, p.nodeOffset));
+	// auto trace = aln.trace->trace;
+	// size_t lastNode, lastOffset, lastLength;
+	// for (size_t j = 0; j < trace.size(); j++) {
+	// 	AlignmentGraph::MatrixPosition p = trace[j].DPposition;
+	// 	p.node = alignmentGraph.GetUnitigNode(p.node, p.nodeOffset);
+	// 	p.nodeOffset -= alignmentGraph.NodeOffset(p.node);
+	// 	if (j == 0) {
+	// 		lastNode = p.node;
+	// 		lastOffset = p.nodeOffset;
+	// 		lastLength = alignmentGraph.NodeLength(p.node);
+	// 		ret.push_back(alignmentGraph.NodeSequences(lastNode, lastOffset));
+	// 		lastOffset++;
+	// 	}
+	// 	else {
+	// 		if (p.node != lastNode) {
+	// 			while (lastOffset < lastLength) {
+	// 				ret.push_back(alignmentGraph.NodeSequences(lastNode, lastOffset));
+	// 				lastOffset++;
+	// 			}
+	// 			lastNode = p.node;
+	// 			lastLength = alignmentGraph.NodeLength(p.node);
+	// 			lastOffset = 0;
+	// 		}
+	// 		while (lastOffset <= p.nodeOffset) {
+	// 			ret.push_back(alignmentGraph.NodeSequences(lastNode, lastOffset));
+	// 			lastOffset++;
+	// 		}
+	// 	}
+	// }
+	return ret;
+}
+
 void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::ConcurrentQueue<std::shared_ptr<FastQ>>& readFastqsQueue, std::atomic<bool>& readStreamingFinished, int threadnum, const Seeder& seeder, AlignerParams params, moodycamel::ConcurrentQueue<std::string*>& GAMOut, moodycamel::ConcurrentQueue<std::string*>& JSONOut, moodycamel::ConcurrentQueue<std::string*>& GAFOut, moodycamel::ConcurrentQueue<std::string*>& correctedOut, moodycamel::ConcurrentQueue<std::string*>& correctedClippedOut, moodycamel::ConcurrentQueue<std::string*>& deallocqueue, AlignmentStats& stats)
 {
 	moodycamel::ProducerToken GAMToken { GAMOut };
@@ -431,6 +518,8 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 				break;
 			else
 				short_id += c;
+		// static std::string target_id = "";//e63e81ea-bf7a-c063-291a-7afaa98410bd";
+		// if (!target_id.empty() && short_id != target_id) continue;
 
 		// cerroutput << tmp << "  " << fastq->seq_id << " : " << fastq->sequence.length() << BufferedWriter::Flush;
 		AlignmentResult alignments;
@@ -440,6 +529,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 		bool cont = false;
 		// auto align_fn = [&seeder, &alignments, &reusableState, &alntimems, &clustertimems, &stats, &coutoutput, &cerroutput, &error, &params, &alignmentGraph] (const std::string &seq_id, const std::string &sequence) {
 		auto align_fn = [&] (const std::string &seq_id, const std::string &sequence) {
+			AlignmentResult alignments;
 			try
 			{
 				if (seeder.mode != Seeder::Mode::None)
@@ -500,246 +590,299 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 				stats.assertionBroke = true;
 				cont = true;
 			}
+			return alignments;
 		};
-		if (params.colinearChaining) {
-			// start spliting long reads into short reads for anchors
-			std::vector<AlignmentGraph::Anchor> A;
-			std::vector<std::vector<GraphAlignerCommon<size_t, int32_t, uint64_t>::TraceItem>> Apos;
-			std::vector<SeedHit> seeds = seeder.getSeeds(fastq->seq_id, fastq->sequence);
-			if (seeds.size() == 0)
-				continue;
-			stats.seedsFound += seeds.size();
-			stats.readsWithASeed += 1;
-			stats.bpInReadsWithASeed += fastq->sequence.size();
-			OrderSeeds(alignmentGraph, seeds);
-			std::sort(seeds.begin(), seeds.end(), [](const SeedHit& left, const SeedHit& right) { return left.seqPos < right.seqPos; });
-			size_t len = params.colinearSplitLen, sep = params.colinearSplitGap; // by default 150,33 
-			size_t sl = 0, sr = 0;
-			
-			auto anchorsStart = std::chrono::system_clock::now();
-			for (size_t l = 0; l + len <= fastq->sequence.length(); l += sep) {
-				while (sr < seeds.size() && seeds[sr].seqPos + seeds[sr].matchLen <= l + len)
-					sr++;
-				while (sl < sr && seeds[sl].seqPos < l)
-					sl++;
-				// cerroutput << short_id << " : " << l << " / " << fastq->sequence.length() << " " << sl << " " << sr << BufferedWriter::Flush;
-				if (sl >= sr)
-					continue;
-				std::string seq = fastq->sequence.substr(l, len);
-				std::string name = short_id + "_" + std::to_string(l) + "_" + std::to_string(l + len - 1);
-				try {
-					// for (size_t k = sl; k < sr; k++)
-					// 	cerroutput << k << " : " << seeds[k].seqPos << BufferedWriter::Flush;
-					// std::vector<SeedHit> tmp_seeds;
-					// for (size_t k = sl; k < sr; k++) {
-					// 	tmp_seeds.push_back(seeds[k]);
-					// 	tmp_seeds.back().seqPos -= l;
-					// }
-					if (seeder.mode != Seeder::Mode::None) {
-						alignments = AlignOneWay(alignmentGraph, name, seq, params.initialBandwidth, params.rampBandwidth, params.maxCellsPerSlice, !params.verboseMode, !params.tryAllSeeds, seeds, reusableState, !params.highMemory, params.forceGlobal, params.preciseClipping, params.seedClusterMinSize, params.seedExtendDensity, params.nondeterministicOptimizations, params.preciseClippingIdentityCutoff, params.Xdropcutoff, sl, sr, l);
-						// alignments = AlignOneWay(alignmentGraph, name, seq, params.initialBandwidth, params.rampBandwidth, params.maxCellsPerSlice, !params.verboseMode, !params.tryAllSeeds, tmp_seeds, reusableState, !params.highMemory, params.forceGlobal, params.preciseClipping, params.seedClusterMinSize, params.seedExtendDensity, params.nondeterministicOptimizations, params.preciseClippingIdentityCutoff, params.Xdropcutoff, 0, tmp_seeds.size(), 0);
-					}
-				}
-				catch (const ThreadReadAssertion::AssertionFailure& a) {
-					coutoutput << "Read " << short_id << " alignment failed (assertion!)" << BufferedWriter::Flush;
-					cerroutput << "Read " << short_id << " alignment failed (assertion!)" << BufferedWriter::Flush;
-					reusableState.clear();
-					stats.assertionBroke = true;
-					cont = true;
-				}
-				if (cont)
-					continue;
-				// all short alignments are used as anchors
-				stats.seedsExtended += alignments.seedsExtended;
-				for (size_t i = 0; i < alignments.alignments.size(); i++) {
-					AlignmentGraph::Anchor anchor = {{}, l, l + len - 1};
-					AlignmentResult::AlignmentItem& alignment = alignments.alignments[i];
-					if (alignment.alignmentFailed())
-						continue;
-					auto trace = alignment.trace->trace;
-					for (size_t j = 0; j < trace.size(); j++) {
-						size_t node = trace[j].DPposition.node;
-						size_t nodeOffset = trace[j].DPposition.nodeOffset;
-						node = alignmentGraph.GetUnitigNode(node, nodeOffset);
-						if (anchor.path.empty() || node != anchor.path.back())
-							anchor.path.push_back(node);
-					}
-					A.push_back(anchor);
-					Apos.push_back(trace);
-					for (size_t j = 0; j < trace.size(); j++)
-						Apos.back()[j].DPposition.seqPos += l;
-				}
-			}
-			auto anchorsEnd = std::chrono::system_clock::now();
-			auto anchorsms = std::chrono::duration_cast<std::chrono::milliseconds>(anchorsEnd - anchorsStart).count();
-			// cerroutput << short_id << " : chaining " << A.size() << " anchors" << BufferedWriter::Flush;
-			auto clcStart = std::chrono::system_clock::now();
-			std::vector<size_t> ids = alignmentGraph.colinearChaining(A, params.colinearGap);
-			auto clcEnd = std::chrono::system_clock::now();
-			auto clcms = std::chrono::duration_cast<std::chrono::milliseconds>(clcEnd - clcStart).count();
-			alignments.alignments.clear();
-			GraphAlignerCommon<size_t, int32_t, uint64_t>::OnewayTrace trace;
-			std::vector<AlignmentGraph::MatrixPosition> pos, longest, tmp;
-			std::unordered_set<size_t> nodes;
-			auto connect = [&](const AlignmentGraph::MatrixPosition &p) {
-				// std::cerr << "connect p" << pos.size() << "  : " << p.node << " " << p.nodeOffset << " "  << p.seqPos << std::endl;
-				tmp.clear();
-				if (pos.empty()) {
-					nodes.insert(p.node);
-					tmp.push_back(p);
-				}
-				else if (p.seqPos >= pos.back().seqPos) {
-					if (pos.back().node == p.node) {
-						// std::cerr << "connect same " << pos.back().nodeOffset << " " << pos.back().seqPos << "  : " << p.node << " " << p.nodeOffset << " "  << p.seqPos << std::endl;
-						for (size_t i = pos.back().nodeOffset, j = pos.back().seqPos; i < p.nodeOffset || j < p.seqPos; ) {
-							// std::cerr << "connect node " << i << " " << j << std::endl;
-							if (i < p.nodeOffset) i++;
-							if (j < p.seqPos) j++;
-							tmp.push_back({ p.node, i, j });
-							if (params.colinearGap != -1 && tmp.size() > params.colinearGap + 1)
-								break;
-						}
-					}
-					else {
-						// std::cerr << "connect node bfs " << pos.back().node << " " << p.node << std::endl;
-						std::vector<size_t> path = alignmentGraph.getChainPath(pos.back().node, p.node, params.colinearGap);
-						// std::cerr << "connect node bfs " << pos.back().node << " " << p.node << " : " << path.size() << std::endl;
-						if (path.empty())
-							return;
-						size_t j = pos.back().seqPos;
-						for (size_t node : path) {
-							nodes.insert(node);
-							long long s = -1, t = alignmentGraph.NodeLength(node) - 1;
-							if (node == path[0]) s = pos.back().nodeOffset;
-							if (node == p.node) t = p.nodeOffset;
-							size_t k = j + (t - s);
-							if (k > p.seqPos) k = p.seqPos;
-							// std::cerr << "connect node " << node << " to " << s << " " << t << " " << k << std::endl;
-							for (long long i = s; i < t || j < k; ) {
-								if (i < t) i++;
-								if (j < k) j++;
-								// std::cerr << "connect    bbbb " << node << " : " << i << " " << j << std::endl;
-								tmp.push_back({ node, i, j });
-								if (params.colinearGap != -1 && tmp.size() > params.colinearGap + 1)
-									break;
-							}
-							if (params.colinearGap != -1 && tmp.size() > params.colinearGap + 1)
-								break;
-						}
-						// std::cerr <<"(tmp.length=" << tmp.size() << ")"; 
-					}
-				}
-			};
-			auto connectStart = std::chrono::system_clock::now();
-			size_t total = 0;
-			size_t ttl = 0, lastpose = 0;
-			for (size_t ai : ids) {
-				const AlignmentGraph::Anchor &anchor = A[ai];
-
-				for (size_t j : anchor.path)
-					ttl += alignmentGraph.NodeLength(j);
-				// cerroutput << short_id << " : "<< ai << " " << anchor.path.size() << "  ";
-
-				// std::cerr << "connect anchor " << ai << " " << anchor.path.size() << " " << anchor.x << " " << anchor.y << std::endl;
-				for (size_t i = 0; i < Apos[ai].size(); i++) {
-					AlignmentGraph::MatrixPosition p = Apos[ai][i].DPposition;
-					p.node = alignmentGraph.GetUnitigNode(p.node, p.nodeOffset);
-					p.nodeOffset -= alignmentGraph.NodeOffset(p.node);
-					// std::cerr << "ccccc " << i << " " << p.node << " " << p.nodeOffset << " " << p.seqPos << " : " << alignmentGraph.NodeLength(p.node) << std::endl;
-					if (p.nodeOffset >= alignmentGraph.NodeLength(p.node)) {
-						// std::cerr << "??? " << alignmentGraph.NodeLength(p.node) << " " << p.node << " " << p.nodeOffset << std::endl;
-						// std::cerr << "??? " << alignmentGraph.NodeLength(p.node/2);
-						exit(1);
-					}
-					// if (short_id == "580e3d48-1aa5-bd01-1a7a-8dee3403f9dd") {
-					// 	cerroutput << short_id << " : " << ai << " " << i << " : " << pos.size() << BufferedWriter::Flush;
-					// }
-					// cerroutput << (int)(nodes.count(p.node) && (pos.back().node != p.node || (pos.back().node == p.node && pos.back().nodeOffset >= p.nodeOffset && pos.back().seqPos >= p.seqPos))) << " ";
-					if (nodes.count(p.node) && (pos.back().node != p.node || (pos.back().node == p.node && (pos.back().nodeOffset > p.nodeOffset || pos.back().seqPos > p.seqPos)) || p == pos.back()))
-						continue;
-					connect(p);
-					// cerroutput << (int)(tmp.size()) << " ";
-					// if (tmp.size() == 0 && !pos.empty()) {
-					// 	cerroutput << " (" << pos.back().node << " " << pos.back().nodeOffset << " " << pos.back().seqPos << ") ";
-					// 	cerroutput << " (" << p.node << " " << p.nodeOffset << " " << p.seqPos << ") ";
-					// 	std::vector<size_t> path = alignmentGraph.getChainPath(pos.back().node, p.node, params.colinearGap);
-					// 	cerroutput << (int)(nodes.count(p.node)) << " : " << path.size() << " : ";
-					// 	for (auto x : path) cerroutput << x << " ";
-					// 	cerroutput << "?? ";
-					// }
-					total += tmp.size();
-					if (tmp.empty()) total += params.colinearGap;
-					if (params.colinearGap != -1 && (tmp.empty() || tmp.size() > params.colinearGap)) {
-						// cerroutput << "replace " << pos.size() << " " << longest.size() << " " << tmp.size() << BufferedWriter::Flush;
-						if (longest.size() < pos.size()) 
-							longest.swap(pos);
-						pos.clear();
-						nodes.clear();
-						connect(p);
-						pos.swap(tmp);
-					}
-					else
-						pos.insert(pos.end(), tmp.begin(), tmp.end());
-				}
-				// if (ai != ids[0]) {
-				// 	std::vector<size_t> path = alignmentGraph.getChainPath(lastpose, anchor.path[0], params.colinearGap);
-				// 	if (!path.empty()) {
-				// 		for (size_t j : path)
-				// 			if (j != lastpose && j != anchor.path[0])
-				// 				ttl += alignmentGraph.NodeLength(j);
-				// 		cerroutput << " with " << path.size();
-				// 	}
-				// }
-				// cerroutput << " now ttl = " << ttl << " but  " << pos.size() << "  " << BufferedWriter::Flush;
-				lastpose = anchor.path.back();
-			}
-			if (longest.size() < pos.size())
-				longest.swap(pos);
-			pos.swap(longest);
-			// cerroutput << short_id << " : connencted " << pos.size() << BufferedWriter::Flush;
-			for (size_t i = 0; i < pos.size(); i++) {
-				bool nodeSwitch = false;
-				if (i + 1 < pos.size() && pos[i].node != pos[i + 1].node)
-					nodeSwitch = true;
-				// if (pos[i].nodeOffset >= alignmentGraph.NodeLength(pos[i].node)) 
-					// std::cerr << "??? " << alignmentGraph.NodeLength(pos[i].node) << " " << pos[i].node << " " << pos[i].nodeOffset << std::endl;
-				trace.trace.emplace_back(pos[i], nodeSwitch, fastq->sequence, alignmentGraph);
-				AlignmentGraph::MatrixPosition &p = trace.trace.back().DPposition;
-				p.nodeOffset += alignmentGraph.NodeOffset(p.node);
-				p.node = alignmentGraph.NodeID(p.node);
-			}
-			// cerroutput << short_id << " : traced " << trace.trace.size() << BufferedWriter::Flush;
-			// for (size_t i = 0; i < pos.size(); i++) {
-			// 	GraphAlignerCommon<size_t, int32_t, uint64_t>::OnewayTrace::TraceItem it;
-			// 	it.DPposition = pos[i]
-			// 	it.nodeSwitch = false;
-			// 	it.sequenceCharacter = '-';
-			// 	it.graphCharacter = '-';
-			// 	trace.trace.push_back(it);
-			// }
-			if (trace.trace.size() > 0) {
-				AlignmentResult::AlignmentItem result { std::move(trace), 0, std::numeric_limits<size_t>::max() };
-				assert(result.trace->trace.size() > 0);
-				result.alignmentScore = 0; //result.trace->score;
-				result.alignmentStart = result.trace->trace[0].DPposition.seqPos;
-				result.alignmentEnd = result.trace->trace.back().DPposition.seqPos + 1;
-				alignments.alignments.push_back(result);
-			}
-			auto connectEnd = std::chrono::system_clock::now();
-			auto connectms = std::chrono::duration_cast<std::chrono::milliseconds>(connectEnd - connectStart).count();
-			cerroutput << tmpidx << " " << short_id << " len=" << fastq->sequence.length() << " : chained " << ids.size() << " / " << A.size() << " anchors, should be " << ttl << " bps actual " << pos.size() << " bps search path " << total << " time " << anchorsms << " " << clcms << " " << connectms << BufferedWriter::Flush;
-			// if (short_id == "580e3d48-1aa5-bd01-1a7a-8dee3403f9dd") exit(1);
-		}
-		else {
-			align_fn(fastq->seq_id, fastq->sequence);
+		
+		if (!params.colinearChaining) {
+			alignments = align_fn(fastq->seq_id, fastq->sequence);
 			if (cont)
 				continue;
+		}
+		if (params.colinearChaining) {
+			// check whether colinear is necessary
+			bool necessary = false;
+			AlignmentResult long_alignments;
+			size_t long_edit_distance;
+			long_alignments = align_fn(fastq->seq_id, fastq->sequence);
+			if (long_alignments.alignments.empty())
+				necessary = true;
+			else {
+				std::string long_pathseq = traceToSequence(alignmentGraph, long_alignments.alignments[0]);
+				if (long_pathseq.length() < 0.9 * fastq->sequence.length())
+					necessary = true;
+				else {
+					EdlibAlignResult result = edlibAlign(long_pathseq.c_str(), long_pathseq.length(), fastq->sequence.c_str(), fastq->sequence.length(), edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0));
+					if (result.status != EDLIB_STATUS_OK) {
+						necessary = true;
+						long_edit_distance = fastq->sequence.length();
+					}
+					else {
+						long_edit_distance = result.editDistance;
+						if (long_edit_distance > 0.2 * fastq->sequence.length())
+							necessary = true;
+					}
+					edlibFreeAlignResult(result);
+				}
+			}
+			if (!necessary)
+				alignments = std::move(long_alignments);
+			else if (necessary) {
+				// start spliting long reads into short reads for anchors
+				std::vector<AlignmentGraph::Anchor> A;
+				std::vector<std::vector<GraphAlignerCommon<size_t, int32_t, uint64_t>::TraceItem>> Apos;
+				std::vector<SeedHit> seeds = seeder.getSeeds(fastq->seq_id, fastq->sequence);
+				if (seeds.size() == 0)
+					continue;
+				stats.seedsFound += seeds.size();
+				stats.readsWithASeed += 1;
+				stats.bpInReadsWithASeed += fastq->sequence.size();
+				OrderSeeds(alignmentGraph, seeds);
+				std::sort(seeds.begin(), seeds.end(), [](const SeedHit& left, const SeedHit& right) { return left.seqPos < right.seqPos; });
+				size_t len = params.colinearSplitLen, sep = params.colinearSplitGap; // by default 150,33 
+				size_t sl = 0, sr = 0;
+				
+				auto anchorsStart = std::chrono::system_clock::now();
+				for (size_t l = 0; l + len <= fastq->sequence.length(); l += sep) {
+					while (sr < seeds.size() && seeds[sr].seqPos + seeds[sr].matchLen <= l + len)
+						sr++;
+					while (sl < sr && seeds[sl].seqPos < l)
+						sl++;
+					// cerroutput << short_id << " : " << l << " / " << fastq->sequence.length() << " " << sl << " " << sr << BufferedWriter::Flush;
+					if (sl >= sr)
+						continue;
+					std::string seq = fastq->sequence.substr(l, len);
+					std::string name = short_id + "_" + std::to_string(l) + "_" + std::to_string(l + len - 1);
+					try {
+						// for (size_t k = sl; k < sr; k++)
+						// 	cerroutput << k << " : " << seeds[k].seqPos << BufferedWriter::Flush;
+						// std::vector<SeedHit> tmp_seeds;
+						// for (size_t k = sl; k < sr; k++) {
+						// 	tmp_seeds.push_back(seeds[k]);
+						// 	tmp_seeds.back().seqPos -= l;
+						// }
+						if (seeder.mode != Seeder::Mode::None) {
+							alignments = AlignOneWay(alignmentGraph, name, seq, params.initialBandwidth, params.rampBandwidth, params.maxCellsPerSlice, !params.verboseMode, !params.tryAllSeeds, seeds, reusableState, !params.highMemory, params.forceGlobal, params.preciseClipping, params.seedClusterMinSize, params.seedExtendDensity, params.nondeterministicOptimizations, params.preciseClippingIdentityCutoff, params.Xdropcutoff, sl, sr, l);
+							// alignments = AlignOneWay(alignmentGraph, name, seq, params.initialBandwidth, params.rampBandwidth, params.maxCellsPerSlice, !params.verboseMode, !params.tryAllSeeds, tmp_seeds, reusableState, !params.highMemory, params.forceGlobal, params.preciseClipping, params.seedClusterMinSize, params.seedExtendDensity, params.nondeterministicOptimizations, params.preciseClippingIdentityCutoff, params.Xdropcutoff, 0, tmp_seeds.size(), 0);
+						}
+					}
+					catch (const ThreadReadAssertion::AssertionFailure& a) {
+						coutoutput << "Read " << short_id << " alignment failed (assertion!)" << BufferedWriter::Flush;
+						cerroutput << "Read " << short_id << " alignment failed (assertion!)" << BufferedWriter::Flush;
+						reusableState.clear();
+						stats.assertionBroke = true;
+						cont = true;
+					}
+					if (cont)
+						continue;
+					// all short alignments are used as anchors
+					stats.seedsExtended += alignments.seedsExtended;
+					for (size_t i = 0; i < alignments.alignments.size(); i++) {
+						AlignmentGraph::Anchor anchor = {{}, l, l + len - 1};
+						AlignmentResult::AlignmentItem& alignment = alignments.alignments[i];
+						if (alignment.alignmentFailed())
+							continue;
+						auto trace = alignment.trace->trace;
+						for (size_t j = 0; j < trace.size(); j++) {
+							size_t node = trace[j].DPposition.node;
+							size_t nodeOffset = trace[j].DPposition.nodeOffset;
+							node = alignmentGraph.GetUnitigNode(node, nodeOffset);
+							if (anchor.path.empty() || node != anchor.path.back())
+								anchor.path.push_back(node);
+						}
+						A.push_back(anchor);
+						Apos.push_back({ trace[0], trace.back() });
+						for (size_t j = 0; j < Apos.back().size(); j++) {
+							AlignmentGraph::MatrixPosition &p = Apos.back()[j].DPposition;
+							p.seqPos += l;
+							p.node = alignmentGraph.GetUnitigNode(p.node, p.nodeOffset);
+							p.nodeOffset -= alignmentGraph.NodeOffset(p.node);
+						}
+					}
+				}
+				auto anchorsEnd = std::chrono::system_clock::now();
+				auto anchorsms = std::chrono::duration_cast<std::chrono::milliseconds>(anchorsEnd - anchorsStart).count();
+				// cerroutput << short_id << " : chaining " << A.size() << " anchors" << BufferedWriter::Flush;
+				auto clcStart = std::chrono::system_clock::now();
+				std::vector<size_t> ids = alignmentGraph.colinearChaining(A, params.colinearGap);
+				auto clcEnd = std::chrono::system_clock::now();
+				auto clcms = std::chrono::duration_cast<std::chrono::milliseconds>(clcEnd - clcStart).count();
+				alignments.alignments.clear();
+				GraphAlignerCommon<size_t, int32_t, uint64_t>::OnewayTrace trace;
+				std::vector<AlignmentGraph::MatrixPosition> longest, tmp;
+				std::vector<size_t> pos_path;
+				std::unordered_set<size_t> nodes;
+				size_t firstNodeOffset, lastNodeOffset;
+				auto connectStart = std::chrono::system_clock::now();
+				for (size_t ai : ids) {
+					const AlignmentGraph::Anchor &anchor = A[ai];
+					if (pos_path.empty()) {
+						pos_path = anchor.path;
+						firstNodeOffset = Apos[ai][0].DPposition.nodeOffset;
+						lastNodeOffset = Apos[ai].back().DPposition.nodeOffset;
+						for (size_t j : pos_path)
+							nodes.insert(j);
+					}
+					else {
+						bool gap = anchor.path[0] == pos_path.back() && params.colinearGap != -1 && Apos[ai][0].DPposition.nodeOffset - lastNodeOffset - 1 > params.colinearGap;
+						std::vector<size_t> path;
+						if (!nodes.count(anchor.path[0]) && pos_path.back() != Apos[ai][0].DPposition.node) {
+							long long gapLimit = params.colinearGap;
+							if (gapLimit != -1)
+								gapLimit -= Apos[ai][0].DPposition.nodeOffset + (alignmentGraph.NodeLength(pos_path.back()) - lastNodeOffset - 1);
+							path = alignmentGraph.getChainPath(pos_path.back(), Apos[ai][0].DPposition.node, gapLimit);
+							if (path.empty())
+								gap = true;
+						}
+						if (gap) {
+							tmp = pathToTrace(alignmentGraph, pos_path, firstNodeOffset, lastNodeOffset);
+							if (longest.size() < tmp.size())
+								longest.swap(tmp);
+							nodes.clear();
+							pos_path.clear();
+							firstNodeOffset = Apos[ai][0].DPposition.nodeOffset;
+						}
+						else
+							for (size_t j : path) 
+								if (!nodes.count(j)) {
+									nodes.insert(j);
+									pos_path.push_back(j);
+								}
+						for (size_t j : anchor.path) 
+							if (!nodes.count(j)) {
+								nodes.insert(j);
+								pos_path.push_back(j);
+							}
+						lastNodeOffset = Apos[ai].back().DPposition.nodeOffset;
+					}
+				}
+				if (!pos_path.empty()) {
+					tmp = pathToTrace(alignmentGraph, pos_path, firstNodeOffset, lastNodeOffset);
+					if (longest.size() < tmp.size())
+						longest.swap(tmp);
+				}
+							
+				std::string pathseq = "";
+				// not convert back to original node ids, to call alignmentGraph.NodeSequences()
+				for (AlignmentGraph::MatrixPosition &p : longest) {
+					pathseq.push_back(alignmentGraph.NodeSequences(p.node, p.nodeOffset));
+				}
+				// align by edit distance to get trace, using edlib
+				size_t alnScore = 0;
+				{
+					EdlibAlignResult result = edlibAlign(pathseq.c_str(), pathseq.length(), fastq->sequence.c_str(), fastq->sequence.length(), edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0));
+					if (result.status != EDLIB_STATUS_OK)
+						longest.clear();
+					else {
+						alnScore = result.editDistance;
+						std::vector<AlignmentGraph::MatrixPosition> trace;
+						trace.reserve(result.alignmentLength);
+						size_t start = result.startLocations[0], end = result.endLocations[0];
+						size_t pos_i = 0, seq_i = result.startLocations[0];
+						for (size_t j = 0; j < result.alignmentLength; j++) {
+							AlignmentGraph::MatrixPosition p(longest[pos_i].node, longest[pos_i].nodeOffset, seq_i);
+							// char a = alignmentGraph.NodeSequences(p.node, p.nodeOffset);
+							// char b = fastq->sequence[seq_i];
+							trace.push_back(p);
+							unsigned char c = result.alignment[j];
+
+							if (c == 0 || c == 3) { // match or mismatch
+								pos_i++;
+								seq_i++;
+							}
+							else if (c == 1)
+								pos_i++;
+							else if (c == 2)
+								seq_i++;
+							seq_i = std::min(seq_i, fastq->sequence.length() - 1);
+						}
+						longest.swap(trace);
+					}
+					edlibFreeAlignResult(result);
+				}
+				
+				for (size_t i = 0; i < longest.size(); i++) {
+					bool nodeSwitch = false;
+					if (i + 1 < longest.size() && longest[i].node != longest[i + 1].node)
+						nodeSwitch = true;
+					trace.trace.emplace_back(longest[i], nodeSwitch, fastq->sequence, alignmentGraph);
+					AlignmentGraph::MatrixPosition &p = trace.trace.back().DPposition;
+					p.nodeOffset += alignmentGraph.NodeOffset(p.node);
+					p.node = alignmentGraph.NodeID(p.node);
+				}
+				
+				if (trace.trace.size() > 0) {
+					AlignmentResult::AlignmentItem result { std::move(trace), 0, std::numeric_limits<size_t>::max() };
+					assert(result.trace->trace.size() > 0);
+					result.alignmentScore = alnScore; //result.trace->score;
+					result.alignmentStart = result.trace->trace[0].DPposition.seqPos;
+					result.alignmentEnd = result.trace->trace.back().DPposition.seqPos + 1;
+					alignments.alignments.push_back(result);
+				}
+				auto connectEnd = std::chrono::system_clock::now();
+				auto connectms = std::chrono::duration_cast<std::chrono::milliseconds>(connectEnd - connectStart).count();
+				bool better = (long_alignments.alignments.empty() || long_edit_distance > alignments.alignments.back().alignmentScore);
+
+				cerroutput << tmpidx << " " << short_id << " len=" << fastq->sequence.length() << " : "
+				<< "chained " << ids.size() << " / " << A.size() << " anchors, actual " << longest.size() << " bps, "
+				<< "time " << anchorsms << " " << clcms << " " << connectms << "  "
+				<< "score=" << alignments.alignments.back().alignmentScore << " better? " << (better?"Yes":"No") 
+				<< BufferedWriter::Flush;
+
+				// compare alignments
+				if (!better) {
+					alignments = std::move(long_alignments);
+				}
+			}
 		}
 
 		stats.allAlignmentsCount += alignments.alignments.size();
 
 		coutoutput << "Read " << fastq->seq_id << " alignment took " << alntimems << "ms" << BufferedWriter::Flush;
 		if (alignments.alignments.size() > 0) alignments.alignments = AlignmentSelection::SelectAlignments(alignments.alignments, selectionOptions);
+
+		// for (size_t i = 0; i < alignments.alignments.size(); i++) {
+		// 	// c++ helloWorld.cpp edlib/src/edlib.cpp -o helloWorld -I edlib/include.
+		// 	std::string pathseq = traceToSequence(alignmentGraph, alignments.alignments[i]);
+		// 	// global edit distance
+		// 	EdlibAlignResult result = edlibAlign(pathseq.c_str(), pathseq.length(), fastq->sequence.c_str(), fastq->sequence.length(), edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0));
+		// 	// local edit distance
+		// 	EdlibAlignResult result2 = edlibAlign(pathseq.c_str(), pathseq.length(), fastq->sequence.c_str(), fastq->sequence.length(), edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_DISTANCE, NULL, 0));
+		// 	// if (result.status == EDLIB_STATUS_OK) {
+		// 	// 	printf("edit_distance('hello', 'world!') = %d\n", result.editDistance);
+		// 	// }
+		// 	// std::cerr << i << "   " << fastq->sequence.length()<< " : " << alignments.alignments[i].alignmentScore << "   ---   " << result.editDistance << "   ---   " << result2.editDistance << std::endl;
+
+		// 	std::vector<AlignmentGraph::MatrixPosition> poss = traceToPoses(alignmentGraph, alignments.alignments[i]), trace;
+		// 	trace.reserve(result.alignmentLength);
+		// 	size_t start = result.startLocations[0], end = result.endLocations[0];
+		// 	size_t pos_i = 0, seq_i = result.startLocations[0];
+		// 	for (size_t j = 0; j < result.alignmentLength; j++) {
+		// 		AlignmentGraph::MatrixPosition p(poss[pos_i].node, poss[pos_i].nodeOffset, seq_i);
+		// 		char a = alignmentGraph.NodeSequences(p.node, p.nodeOffset);
+		// 		char b = fastq->sequence[seq_i];
+		// 		p.nodeOffset += alignmentGraph.NodeOffset(p.node);
+		// 		p.node = alignmentGraph.NodeID(p.node);
+		// 		trace.push_back(p);
+		// 		unsigned char c = result.alignment[j];
+		// 		if (c == 0 || c == 3) { // match or mismatch
+		// 			pos_i++;
+		// 			seq_i++;
+		// 			// if (c == 0 && a != b) std::cerr << a << " " << b << " " << c << std::endl;
+		// 			// if (c == 1 && a == b) std::cerr << a << " " << b << " " << c << std::endl;
+		// 		}
+		// 		else if (c == 1)
+		// 			pos_i++;
+		// 		else if (c == 2)
+		// 			seq_i++;
+		// 	}
+		// 	// for (size_t j = 0; j < result.numLocations && j < 1; j++) {
+		// 	// 	std::cerr << " ? " << j << " " << result.startLocations[j] << " : " << result.endLocations[j] << std::endl;
+		// 	// }
+		// 	// std::cerr << result.numLocations << " " << result.alignmentLength << " @ " << pos_i << " / " << poss.size() << " " << seq_i << " / " << fastq->sequence.length() << std::endl;
+
+		// 	edlibFreeAlignResult(result);
+		// 	edlibFreeAlignResult(result2);
+		// }
 
 		//failed alignment, don't output
 		if (alignments.alignments.size() == 0)
@@ -893,8 +1036,8 @@ void alignReads(AlignerParams params)
 	assertSetNoRead("Preprocessing");
 	std::cout << "Co-linear chaining " << (params.colinearChaining ? "on" : "off");
 	if (params.colinearChaining) {
-		size_t len = params.colinearSplitLen, sep = params.colinearSplitGap; // by default 150,33 
-		std::cout << " splits=(" << len << "," << sep << ")";
+		size_t len = params.colinearSplitLen, sep = params.colinearSplitGap, gap = params.colinearGap; // by default 150,33,1000
+		std::cout << " splits=(" << len << "," << sep << "," << gap << ")";
 	}
 	std::cout << std::endl;
 
@@ -903,7 +1046,7 @@ void alignReads(AlignerParams params)
 	MummerSeeder* mummerseeder = nullptr;
 	auto alignmentGraph = getGraph(params.graphFile, &mummerseeder, params);
 	if (params.generatePath) {
-		std::vector<size_t> path = alignmentGraph.generatePath(params.fastqFiles[0], params.outputGAMFile);
+		std::vector<size_t> path = alignmentGraph.generatePath(params.fastqFiles[0], params.outputGAMFile, params.generatePathSeed);
 		return;
 	}
 	if (params.colinearChaining)

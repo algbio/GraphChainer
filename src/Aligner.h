@@ -51,6 +51,7 @@ struct AlignerParams
 
 	bool colinearChaining;
 	bool generatePath;
+	long long generatePathSeed;
 	long long colinearGap;
 	long long colinearSplitLen;
 	long long colinearSplitGap;

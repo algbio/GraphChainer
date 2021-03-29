@@ -64,6 +64,7 @@ int main(int argc, char** argv)
 		("precise-clipping", boost::program_options::value<double>(), "clip the alignment ends more precisely with arg as the identity cutoff between correct / wrong alignments (float)")
 		("cigar-match-mismatch", "use M for matches and mismatches in the cigar string instead of = and X")
 		("generate-path", "generate a path and write to file instead of aligning reads from file")
+		("generate-path-seed", boost::program_options::value<long long>(), "seed for generating path")
 	;
 	boost::program_options::options_description seeding("Seeding");
 	seeding.add_options()
@@ -81,9 +82,9 @@ int main(int argc, char** argv)
 		("seedless-DP", "no seeding, instead use DP alignment algorithm for the entire first row. VERY SLOW except on tiny graphs")
 		("DP-restart-stride", boost::program_options::value<size_t>(), "if --seedless-DP doesn't span the entire read, restart after arg base pairs (int)")
 		("colinear-chaining", "use co-linear chaining to cluster seeds")
-		("colinear-gap", boost::program_options::value<long long>(), "max gap distance between adjacent anchors")
-		("colinear-split-len", boost::program_options::value<long long>(), "splited short read lengths")
-		("colinear-split-gap", boost::program_options::value<long long>(), "splited short read gaps")
+		("colinear-gap", boost::program_options::value<long long>(), "max gap distance between adjacent anchors (default 10000)")
+		("colinear-split-len", boost::program_options::value<long long>(), "splited short read lengths [default 150]")
+		("colinear-split-gap", boost::program_options::value<long long>(), "splited short read gaps [default 150]")
 	;
 	boost::program_options::options_description alignment("Extension");
 	alignment.add_options()
@@ -171,6 +172,7 @@ int main(int argc, char** argv)
 	params.cigarMatchMismatchMerge = false;
 	params.colinearChaining = false;
 	params.generatePath = false;
+	params.generatePathSeed = 0;
 
 	std::vector<std::string> outputAlns;
 	bool paramError = false;
@@ -210,9 +212,9 @@ int main(int argc, char** argv)
 	{
 		params.alignmentSelectionMethod = AlignmentSelection::SelectionMethod::All;
 		params.tryAllSeeds = true;
-		params.colinearGap = 1000;
+		params.colinearGap = 10000;
 		params.colinearSplitLen = 150;
-		params.colinearSplitGap = 33;
+		params.colinearSplitGap = 150;
 	}
 
 	if (vm.count("graph")) params.graphFile = vm["graph"].as<std::string>();
@@ -251,6 +253,7 @@ int main(int argc, char** argv)
 	if (vm.count("high-memory")) params.highMemory = true;
 	if (vm.count("cigar-match-mismatch")) params.cigarMatchMismatchMerge = true;
 	if (vm.count("generate-path")) params.generatePath = true;
+	if (vm.count("generate-path-seed")) params.generatePathSeed = vm["generate-path-seed"].as<long long>();
 
 	int resultSelectionMethods = 0;
 	if (vm.count("all-alignments"))

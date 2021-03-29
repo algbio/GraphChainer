@@ -1404,9 +1404,10 @@ void AlignmentGraph::buildMPC() {
 }
 
 
-std::vector<size_t> AlignmentGraph::generatePath(const std::string &seq_out, const std::string &path_out) {
-	static std::random_device rd;
-	static std::mt19937 gen;
+std::vector<size_t> AlignmentGraph::generatePath(const std::string &seq_out, const std::string &path_out, const size_t seed) {
+	// std::random_device rd;
+	std::mt19937 gen(seed);
+	gen.discard(700000); // discard first a few to properly initialize the random engine
 	auto choose = [&](const std::vector<size_t> &vec) {
 		return vec[gen() % vec.size()];
 	};
