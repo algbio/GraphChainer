@@ -600,30 +600,30 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 		}
 		if (params.colinearChaining) {
 			// check whether colinear is necessary
-			bool necessary = false;
+			bool necessary = true;
 			AlignmentResult long_alignments;
 			size_t long_edit_distance;
-			long_alignments = align_fn(fastq->seq_id, fastq->sequence);
-			if (long_alignments.alignments.empty())
-				necessary = true;
-			else {
-				std::string long_pathseq = traceToSequence(alignmentGraph, long_alignments.alignments[0]);
-				if (long_pathseq.length() < 0.9 * fastq->sequence.length())
-					necessary = true;
-				else {
-					EdlibAlignResult result = edlibAlign(long_pathseq.c_str(), long_pathseq.length(), fastq->sequence.c_str(), fastq->sequence.length(), edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0));
-					if (result.status != EDLIB_STATUS_OK) {
-						necessary = true;
-						long_edit_distance = fastq->sequence.length();
-					}
-					else {
-						long_edit_distance = result.editDistance;
-						if (long_edit_distance > 0.2 * fastq->sequence.length())
-							necessary = true;
-					}
-					edlibFreeAlignResult(result);
-				}
-			}
+			// long_alignments = align_fn(fastq->seq_id, fastq->sequence);
+			// if (long_alignments.alignments.empty())
+			// 	necessary = true;
+			// else {
+			// 	std::string long_pathseq = traceToSequence(alignmentGraph, long_alignments.alignments[0]);
+			// 	if (long_pathseq.length() < 0.9 * fastq->sequence.length())
+			// 		necessary = true;
+			// 	else {
+			// 		EdlibAlignResult result = edlibAlign(long_pathseq.c_str(), long_pathseq.length(), fastq->sequence.c_str(), fastq->sequence.length(), edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0));
+			// 		if (result.status != EDLIB_STATUS_OK) {
+			// 			necessary = true;
+			// 			long_edit_distance = fastq->sequence.length();
+			// 		}
+			// 		else {
+			// 			long_edit_distance = result.editDistance;
+			// 			if (long_edit_distance > 0.2 * fastq->sequence.length())
+			// 				necessary = true;
+			// 		}
+			// 		edlibFreeAlignResult(result);
+			// 	}
+			// }
 			if (!necessary)
 				alignments = std::move(long_alignments);
 			else if (necessary) {
@@ -820,18 +820,18 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 				}
 				auto connectEnd = std::chrono::system_clock::now();
 				auto connectms = std::chrono::duration_cast<std::chrono::milliseconds>(connectEnd - connectStart).count();
-				bool better = (long_alignments.alignments.empty() || long_edit_distance > alignments.alignments.back().alignmentScore);
+				// bool better = (long_alignments.alignments.empty() || long_edit_distance > alignments.alignments.back().alignmentScore);
 
 				cerroutput << tmpidx << " " << short_id << " len=" << fastq->sequence.length() << " : "
 				<< "chained " << ids.size() << " / " << A.size() << " anchors, actual " << longest.size() << " bps, "
 				<< "time " << anchorsms << " " << clcms << " " << connectms << "  "
-				<< "score=" << alignments.alignments.back().alignmentScore << " better? " << (better?"Yes":"No") 
+				<< "score=" << alignments.alignments.back().alignmentScore// << " better? " << (better?"Yes":"No") 
 				<< BufferedWriter::Flush;
 
 				// compare alignments
-				if (!better) {
-					alignments = std::move(long_alignments);
-				}
+				// if (!better) {
+				// 	alignments = std::move(long_alignments);
+				// }
 			}
 		}
 
