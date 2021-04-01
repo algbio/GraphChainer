@@ -518,8 +518,8 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 				break;
 			else
 				short_id += c;
-		// static std::string target_id = "";//e63e81ea-bf7a-c063-291a-7afaa98410bd";
-		// if (!target_id.empty() && short_id != target_id) continue;
+		static std::string target_id = "";//"3436a408-38a3-5ec2-beb6-b10630e5226d";
+		if (!target_id.empty() && short_id != target_id) continue;
 
 		// cerroutput << tmp << "  " << fastq->seq_id << " : " << fastq->sequence.length() << BufferedWriter::Flush;
 		AlignmentResult alignments;
@@ -713,8 +713,10 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 				std::unordered_set<size_t> nodes;
 				size_t firstNodeOffset, lastNodeOffset;
 				auto connectStart = std::chrono::system_clock::now();
+				int ai_idx = 0;
 				for (size_t ai : ids) {
 					const AlignmentGraph::Anchor &anchor = A[ai];
+					// std::cerr << short_id << " : connect " << ai << " " << (ai_idx++) << "/" << ids.size() << "  " << pos_path.size() << "   longsest" << longest.size()<< std::endl;
 					if (pos_path.empty()) {
 						pos_path = anchor.path;
 						firstNodeOffset = Apos[ai][0].DPposition.nodeOffset;
@@ -723,17 +725,22 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 							nodes.insert(j);
 					}
 					else {
-						bool gap = anchor.path[0] == pos_path.back() && params.colinearGap != -1 && Apos[ai][0].DPposition.nodeOffset - lastNodeOffset - 1 > params.colinearGap;
+						bool gap = anchor.path[0] == pos_path.back() && params.colinearGap != -1 && (long long)Apos[ai][0].DPposition.nodeOffset - (long long)lastNodeOffset > params.colinearGap + 1;
+						if (gap) {
+							// std::cerr << " ? " << anchor.path[0] << " to " << pos_path.back() << " : " << Apos[ai][0].DPposition.nodeOffset << " " << lastNodeOffset << " || " << Apos[ai][0].DPposition.node << std::endl;
+						}
 						std::vector<size_t> path;
 						if (!nodes.count(anchor.path[0]) && pos_path.back() != Apos[ai][0].DPposition.node) {
 							long long gapLimit = params.colinearGap;
 							if (gapLimit != -1)
-								gapLimit -= Apos[ai][0].DPposition.nodeOffset + (alignmentGraph.NodeLength(pos_path.back()) - lastNodeOffset - 1);
+								gapLimit -= (long long)Apos[ai][0].DPposition.nodeOffset + (long long)(alignmentGraph.NodeLength(pos_path.back()) - (long long)lastNodeOffset - 1);
 							path = alignmentGraph.getChainPath(pos_path.back(), Apos[ai][0].DPposition.node, gapLimit);
+							// std::cerr << "gap _bfs_ " << (int)(gap) << " " << path.size() << "  " << gapLimit << std::endl;
 							if (path.empty())
 								gap = true;
 						}
 						if (gap) {
+							// std::cerr << "gap _gap_ " << (int)(gap) << " " << path.size() << "  " << std::endl;
 							tmp = pathToTrace(alignmentGraph, pos_path, firstNodeOffset, lastNodeOffset);
 							if (longest.size() < tmp.size())
 								longest.swap(tmp);
@@ -760,7 +767,9 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 					if (longest.size() < tmp.size())
 						longest.swap(tmp);
 				}
-							
+				
+				exit(0);
+
 				std::string pathseq = "";
 				// not convert back to original node ids, to call alignmentGraph.NodeSequences()
 				for (AlignmentGraph::MatrixPosition &p : longest) {
