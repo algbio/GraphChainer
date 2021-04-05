@@ -1402,6 +1402,12 @@ void AlignmentGraph::buildMPC() {
 	std::cout << "MPC building done" << std::endl;
 	// std::cout << checkMinPathCover(mpc) << std::endl;
 }
+void AlignmentGraph::loadMPC(const std::string &filename) {
+	
+}
+void AlignmentGraph::saveMPC(const std::string &filename) {
+	
+}
 
 
 std::vector<size_t> AlignmentGraph::generatePath(const std::string &seq_out, const std::string &path_out, const size_t seed) {
@@ -1497,6 +1503,119 @@ struct SegmentTree {
 	}
 };
 
+
+template<typename T, typename V>
+struct Treap {
+	struct Node {
+		int ls, rs, size, pri;
+		T key;
+		V value, max;
+	};
+	std::vector<Node> t;
+	int root;
+	V default_value;
+	Treap(const V &default_value = V()) : default_value(default_value) {
+		root = 0;
+		t.resize(1);
+	}
+	inline int randomm() {
+		static int seed = 703; 
+		return seed = int(seed * 48271LL % 2147483647);
+	}
+	inline int update(int now) {
+		t[now].size = 1;
+		t[now].max = t[now].value;
+		if (t[now].ls) {
+			t[now].size += t[t[now].ls].size;
+			t[now].max = max(t[now].max, t[t[now].ls].max);
+		}
+		if (t[now].rs) {
+			t[now].size += t[t[now].rs].size;
+			t[now].max = max(t[now].max, t[t[now].rs].max);
+		}
+		return now;
+	}
+	inline int new_node (T key, V value) {
+		t.push_back(Node({ 0, 0, 1, randomm(), key, value, value }));
+		return t.size() - 1;
+	}
+	int merge(int x, int y) {
+		if (!x || !y) return x + y;
+		if (t[x].pri > t[y].pri) {
+			t[x].rs = merge(t[x].rs, y);
+			return update(x);
+		}
+		else {
+			t[y].ls = merge(x, t[y].ls);
+			return update(y);
+		}
+	}
+	void split(int now, T key, int &x, int &y) {
+		if (!now) {
+			x = y = 0; 
+			return;
+		}
+		if (t[now].key <= key) {
+			x = now;
+			split(t[now].rs, key, t[now].rs, y);
+			update(x);
+		}
+		else {
+			y = now;
+			split(t[now].ls, key, x, t[now].ls);
+			update(y);
+		}
+	}
+	// void Del(int &root, int key) {
+	// 	int x = 0, y = 0, z = 0;
+	// 	split(root, key, x, z);
+	// 	split(x, key - 1, x, y);
+	// 	y = merge(t[y].ls, t[y].rs);
+	// 	root = merge(merge(x, y), z);
+	// }
+	void add(T key, V value) {
+		int x = 0, y = 0, z = 0;
+		split(root, key, x, y);
+		root = merge(merge(x, new_node(key, value)), y);
+	}	
+	V RMQ(T l, T r) {
+		int now = root;
+		while (now != 0 && (t[now].key < l || t[now].key > r)) {
+			if (t[now].key < l)
+				now = t[now].rs;
+			else
+				now = t[now].ls;
+		}
+		if (now == 0) {
+			return default_value;
+		}
+		V ret = t[now].value;
+		int x = t[now].ls;
+		while (x != 0) {
+			if (t[x].key >= l) {
+				ret = max(ret, t[x].value);
+				if (t[x].rs != 0)
+					ret = max(ret, t[t[x].rs].max);
+				x = t[x].ls;
+			}
+			else
+				x = t[x].rs;
+		}
+		int y = t[now].rs;
+		while (y != 0) {
+			if (t[y].key <= r) {
+				ret = max(ret, t[y].value);
+				if (t[y].ls != 0)
+					ret = max(ret, t[t[y].ls].max);
+				y = t[y].rs;
+			}
+			else
+				y = t[y].ls;
+		}
+		return ret;
+	}
+};
+
 std::vector<size_t> AlignmentGraph::colinearChaining(const std::vector<Anchor> &A, long long sep_limit) const {
 	typedef long long LL;
 	auto getSortedMap = [&](std::vector<LL> a) {
@@ -1511,7 +1630,9 @@ std::vector<size_t> AlignmentGraph::colinearChaining(const std::vector<Anchor> &
 	LL K = mpc.size(), N = NodeSize();
 	std::pair<LL, LL> defaul_value = { -N*2, -1 };
 	// std::cerr <<"defaul_value "<<defaul_value.first<<endl;
-	std::vector<SegmentTree<std::pair<LL, LL>>> T(K, SegmentTree(N, defaul_value)), I(K, SegmentTree(N, defaul_value));
+	typedef Treap<LL, std::pair<LL, LL>> IndexT;
+	// std::vector<SegmentTree<std::pair<LL, LL>>> T(K, SegmentTree(N, defaul_value)), I(K, SegmentTree(N, defaul_value));
+	std::vector<IndexT> T(K, IndexT(defaul_value)), I(K, IndexT(defaul_value));
 	std::vector<std::vector<LL>> starts(N), ends(N);
 	std::vector<std::pair<LL, LL>> C(A.size());
 	// std::cerr << "CLC " << K << "  "<< N << std::endl;
@@ -1546,7 +1667,8 @@ std::vector<size_t> AlignmentGraph::colinearChaining(const std::vector<Anchor> &
 			}
 			auto id_map = getSortedMap(pos);
 			LL Size = (LL)id_map.size();
-			SegmentTree tmpT(Size, defaul_value), tmpI(Size, defaul_value);
+			// IndexT tmpT(Size, defaul_value), tmpI(Size, defaul_value);
+			IndexT tmpT(defaul_value), tmpI(defaul_value);
 			for (LL j : ids) {
 				if (A[j].path[0] == v) {
 					std::pair<LL, LL> q = tmpT.RMQ(id_map[0], id_map[A[j].x - 1]);

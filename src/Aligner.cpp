@@ -518,8 +518,8 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 				break;
 			else
 				short_id += c;
-		static std::string target_id = "";//"3436a408-38a3-5ec2-beb6-b10630e5226d";
-		if (!target_id.empty() && short_id != target_id) continue;
+		// static std::string target_id = "1893a91a-de0e-8f4f-8e46-26305eba7ad6";
+		// if (!target_id.empty() && short_id != target_id) continue;
 
 		// cerroutput << tmp << "  " << fastq->seq_id << " : " << fastq->sequence.length() << BufferedWriter::Flush;
 		AlignmentResult alignments;
@@ -682,6 +682,8 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 						if (alignment.alignmentFailed())
 							continue;
 						auto trace = alignment.trace->trace;
+						if (trace.size() == 0)
+							continue;
 						for (size_t j = 0; j < trace.size(); j++) {
 							size_t node = trace[j].DPposition.node;
 							size_t nodeOffset = trace[j].DPposition.nodeOffset;
@@ -767,8 +769,6 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 					if (longest.size() < tmp.size())
 						longest.swap(tmp);
 				}
-				
-				exit(0);
 
 				std::string pathseq = "";
 				// not convert back to original node ids, to call alignmentGraph.NodeSequences()
@@ -831,11 +831,12 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 				auto connectms = std::chrono::duration_cast<std::chrono::milliseconds>(connectEnd - connectStart).count();
 				// bool better = (long_alignments.alignments.empty() || long_edit_distance > alignments.alignments.back().alignmentScore);
 
-				cerroutput << tmpidx << " " << short_id << " len=" << fastq->sequence.length() << " : "
-				<< "chained " << ids.size() << " / " << A.size() << " anchors, actual " << longest.size() << " bps, "
-				<< "time " << anchorsms << " " << clcms << " " << connectms << "  "
-				<< "score=" << alignments.alignments.back().alignmentScore// << " better? " << (better?"Yes":"No") 
-				<< BufferedWriter::Flush;
+				if (params.shortVerboseMode || params.verboseMode)
+					cerroutput << tmpidx << " " << short_id << " len=" << fastq->sequence.length() << " : "
+					<< "chained " << ids.size() << " / " << A.size() << " anchors, actual " << longest.size() << " bps, "
+					<< "time " << anchorsms << " " << clcms << " " << connectms << "  "
+					<< "score=" << alnScore// << " better? " << (better?"Yes":"No") 
+					<< BufferedWriter::Flush;
 
 				// compare alignments
 				// if (!better) {
@@ -1058,8 +1059,17 @@ void alignReads(AlignerParams params)
 		std::vector<size_t> path = alignmentGraph.generatePath(params.fastqFiles[0], params.outputGAMFile, params.generatePathSeed);
 		return;
 	}
-	if (params.colinearChaining)
-		alignmentGraph.buildMPC();
+	if (params.colinearChaining) {
+		bool mpcReady = false;
+		if (params.IndexMpcFile != "" && is_file_exist(params.IndexMpcFile)) {
+			alignmentGraph.loadMPC(params.IndexMpcFile);
+			mpcReady = true; //alignmentGraph.checkMPC();
+		}
+		if (!mpcReady) {
+			alignmentGraph.buildMPC();
+			alignmentGraph.saveMPC(params.IndexMpcFile);
+		}
+	}
 	bool loadMinimizerSeeder = params.minimizerSeedDensity != 0;
 	MinimizerSeeder* minimizerseeder = nullptr;
 	if (loadMinimizerSeeder)

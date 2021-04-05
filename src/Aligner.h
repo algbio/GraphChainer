@@ -22,6 +22,7 @@ struct AlignerParams
 	std::string outputGAFFile;
 	std::string outputCorrectedFile;
 	std::string outputCorrectedClippedFile;
+	std::string IndexMpcFile;
 	bool verboseMode;
 	bool shortVerboseMode;
 	bool tryAllSeeds;

@@ -85,6 +85,7 @@ int main(int argc, char** argv)
 		("colinear-gap", boost::program_options::value<long long>(), "max gap distance between adjacent anchors (default 10000)")
 		("colinear-split-len", boost::program_options::value<long long>(), "splited short read lengths [default 150]")
 		("colinear-split-gap", boost::program_options::value<long long>(), "splited short read gaps [default 150]")
+		("mpc-index,i", boost::program_options::value<std::string>(), "minimium path cover index filename")
 	;
 	boost::program_options::options_description alignment("Extension");
 	alignment.add_options()
@@ -173,6 +174,7 @@ int main(int argc, char** argv)
 	params.colinearChaining = false;
 	params.generatePath = false;
 	params.generatePathSeed = 0;
+	params.IndexMpcFile = "";
 
 	std::vector<std::string> outputAlns;
 	bool paramError = false;
@@ -241,6 +243,8 @@ int main(int argc, char** argv)
 	if (vm.count("colinear-gap")) params.colinearGap = vm["colinear-gap"].as<long long>();
 	if (vm.count("colinear-split-len")) params.colinearSplitLen = vm["colinear-split-len"].as<long long>();
 	if (vm.count("colinear-split-gap")) params.colinearSplitGap = vm["colinear-split-gap"].as<long long>();
+	if (vm.count("mpc-index")) params.IndexMpcFile = vm["mpc-index"].as<std::string>();
+	
 	
 	if (vm.count("DP-restart-stride")) params.DPRestartStride = vm["DP-restart-stride"].as<size_t>();
 

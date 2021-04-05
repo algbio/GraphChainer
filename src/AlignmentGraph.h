@@ -114,6 +114,8 @@ public:
 		size_t x, y;
 	};
 	void buildMPC();
+	void loadMPC(const std::string &filename);
+	void saveMPC(const std::string &filename);
 	std::vector<size_t> generatePath(const std::string &seq_out, const std::string &path_out, const size_t seed = 0);
 	std::vector<size_t> colinearChaining(const std::vector<Anchor> &anchors, long long sep_limit) const;
 	std::vector<size_t> getChainPath(size_t s, size_t t, long long sep_limit) const;
