@@ -1309,6 +1309,7 @@ void AlignmentGraph::computeMPCIndex(const std::vector<std::vector<size_t>> &pc)
 	std::vector<std::vector<LL>> last2reach;
 	LL K = pc.size(), N = NodeSize();
 	forwards.resize(N);
+	backwards.resize(N);
 	last2reach.resize(N, std::vector<LL>(K, -1));
 	paths.resize(N);
 	for (LL i = 0; i < K; i++)
@@ -1351,8 +1352,15 @@ void AlignmentGraph::computeMPCIndex(const std::vector<std::vector<size_t>> &pc)
 			if (idx != -1) {
 				idx = pc[k][idx];
 				forwards[idx].push_back({ i, k });
+				backwards[i].push_back({idx, k});
 			}
 		}
+	// for (LL i = 0; i < N; i++) {
+	// 	if (backwards[i].size() > 1) {
+	// 		std::sort(backwards[i].begin(), backwards[i].end());
+	// 		backwards[i].erase(std::unqiue(backwards[i].begin(), backwards[i].end()), backwards[i].end());
+	// 	}
+	// }
 }
 
 bool AlignmentGraph::checkMinPathCover(const std::vector<std::vector<size_t>> &pc) {
@@ -1633,24 +1641,33 @@ std::vector<size_t> AlignmentGraph::colinearChaining(const std::vector<Anchor> &
 	typedef Treap<LL, std::pair<LL, LL>> IndexT;
 	// std::vector<SegmentTree<std::pair<LL, LL>>> T(K, SegmentTree(N, defaul_value)), I(K, SegmentTree(N, defaul_value));
 	std::vector<IndexT> T(K, IndexT(defaul_value)), I(K, IndexT(defaul_value));
-	std::vector<std::vector<LL>> starts(N), ends(N);
+	// std::vector<std::vector<LL>> starts(N), ends(N);
+	std::vector<std::pair<LL, std::pair<LL, LL>>> endpoints;
 	std::vector<std::pair<LL, LL>> C(A.size());
-	// std::cerr << "CLC " << K << "  "<< N << std::endl;
 	for (LL j = 0; j < A.size(); j++) {
-		// std::cerr << j << " : " << j << " / " << A.size() << " : " <<  A[j].path.size() << " " << A[j].x << " " << A[j].y << std::endl;
-		// if (!A[j].path.empty()) std::cerr << A[j].path[0] << " "  << A[j].path.back() << std::endl;
-		starts[A[j].path[0]].push_back(j);
-		ends[A[j].path.back()].push_back(j);
+		endpoints.push_back({ A[j].path[0], {j, -1} });
+		endpoints.push_back({ A[j].path.back(), {j, -2} });
+		for (std::pair<LL, LL> b : backwards[A[j].path[0]])
+			endpoints.push_back({b.first, {j, b.second}});
 		C[j] = { A[j].y - A[j].x + 1, -1 };
 	}
-	for (LL vidx = 0; vidx < N; vidx++) {
-		LL v = topo[vidx];
-		// std::cerr << "CLC node " << vidx << " "  << v << " 1" << std::endl;;
-		if (!starts[v].empty() && !ends[v].empty()) {
-			std::vector<LL> ids = starts[v];
-			for (LL j : ends[v])
-				ids.push_back(j);
-			// std::cerr << ids.size() << std::endl;
+	std::sort(endpoints.begin(), endpoints.end(), [&](const std::pair<LL, std::pair<LL, LL>> &p1, const std::pair<LL, std::pair<LL, LL>> &p2){
+		return topo_ids[p1.first] < topo_ids[p2.first];
+	});
+	// for (LL vidx = 0; vidx < N; vidx++) {
+	// 	LL v = topo[vidx];
+	for (LL vidx = 0, ridx = 0; vidx < endpoints.size(); vidx = ridx) {
+		// if (vidx > 0 && endpoints[vidx - 1] == endpoints[vidx])
+		// 	continue;
+		LL v = endpoints[vidx].first;
+		ridx = vidx + 1;
+		while (ridx < endpoints.size() && endpoints[ridx].first == v)
+			ridx++;
+		std::vector<LL> ids;
+		for (size_t j = vidx; j < ridx; j++)
+			if (endpoints[j].second.second < 0)
+				ids.push_back(endpoints[j].second.first);
+		if (ids.size() > 0) {
 			std::sort(ids.begin(), ids.end(), [&](LL i, LL j) { 
 				if (A[i].y != A[j].y)
 					return A[i].y < A[j].y;
@@ -1682,26 +1699,26 @@ std::vector<size_t> AlignmentGraph::colinearChaining(const std::vector<Anchor> &
 				}
 			}
 		}
-		// std::cerr << v <<  " 2" << std::endl;
-		if (ends[v].size() > 0)
-			// std::cerr << v <<  " " << ends.size() << std::endl;
-		for (LL j : ends[v]) {
-			for (LL k : paths[v]) {
-				T[k].add(A[j].y, {C[j].first, j});
-				I[k].add(A[j].y, {C[j].first - A[j].y, j});
-			}
+		for (size_t vi = vidx; vi < ridx; vi++) {
+			if (endpoints[vi].second.second != -2)
+				continue;
+			size_t j = endpoints[vi].second.first;
+			if (v == A[j].path.back())
+				for (LL k : paths[v]) {
+					T[k].add(A[j].y, {C[j].first, j});
+					I[k].add(A[j].y, {C[j].first - A[j].y, j});
+				}
 		}
-		// std::cerr << v <<  " 3" << std::endl;
-		for (auto ui : forwards[v]) {
-			LL u = ui.first, k = ui.second;
-			for (LL j : starts[u]) {
-				std::pair<LL, LL> q = T[k].RMQ(0, A[j].x - 1);
-				C[j] = std::max(C[j], {A[j].y - A[j].x + 1 + q.first, q.second}); 
-				q = I[k].RMQ(A[j].x, A[j].y - 1);
-				C[j] = std::max(C[j], {A[j].y + q.first, q.second});
-			}
+		for (size_t vi = vidx; vi < ridx; vi++) {
+			if (endpoints[vi].second.second < 0)
+				continue;
+			size_t j = endpoints[vi].second.first;
+			LL u = A[j].path[0], k = endpoints[vi].second.second;
+			std::pair<LL, LL> q = T[k].RMQ(0, A[j].x - 1);
+			C[j] = std::max(C[j], {A[j].y - A[j].x + 1 + q.first, q.second}); 
+			q = I[k].RMQ(A[j].x, A[j].y - 1);
+			C[j] = std::max(C[j], {A[j].y + q.first, q.second});
 		}
-		// std::cerr << v <<  " 4" << std::endl;
 	}
 	std::pair<LL, LL> best = {0, -1};
 	for (LL j = 0; j < A.size(); j++) 

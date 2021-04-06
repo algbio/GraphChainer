@@ -86,6 +86,7 @@ int main(int argc, char** argv)
 		("colinear-split-len", boost::program_options::value<long long>(), "splited short read lengths [default 150]")
 		("colinear-split-gap", boost::program_options::value<long long>(), "splited short read gaps [default 150]")
 		("mpc-index,i", boost::program_options::value<std::string>(), "minimium path cover index filename")
+		("fast-mode", "skip edit distance computation after chaining (output the path instead of alignment)")
 	;
 	boost::program_options::options_description alignment("Extension");
 	alignment.add_options()
@@ -175,6 +176,7 @@ int main(int argc, char** argv)
 	params.generatePath = false;
 	params.generatePathSeed = 0;
 	params.IndexMpcFile = "";
+	params.fastMode = false;
 
 	std::vector<std::string> outputAlns;
 	bool paramError = false;
@@ -209,6 +211,9 @@ int main(int argc, char** argv)
 			paramError = true;
 		}
 	}
+
+	if (vm.count("fast-mode"))
+		params.fastMode = true;
 	
 	if (vm.count("colinear-chaining"))
 	{

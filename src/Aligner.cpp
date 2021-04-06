@@ -777,7 +777,17 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 				}
 				// align by edit distance to get trace, using edlib
 				size_t alnScore = 0;
-				{
+				if (params.fastMode) {
+					if (ids.size() > 0) {
+						size_t x = A[ids[0]].x, y = A[ids.back()].y;
+						for (size_t j = 0; j < longest.size(); j++) {
+							longest[j].seqPos = std::min(y, x + j);
+							if (alignmentGraph.NodeSequences(longest[j].node, longest[j].nodeOffset) != fastq->sequence[longest[j].seqPos])
+								alnScore++;
+						}
+					}
+				}
+				else {
 					EdlibAlignResult result = edlibAlign(pathseq.c_str(), pathseq.length(), fastq->sequence.c_str(), fastq->sequence.length(), edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0));
 					if (result.status != EDLIB_STATUS_OK)
 						longest.clear();

@@ -164,7 +164,8 @@ private:
 	std::vector<size_t> topo_ids;
 	std::vector<std::vector<size_t>> mpc;
 	std::vector<std::vector<size_t>> paths;
-	std::vector<std::vector<std::pair<size_t, size_t>>> forwards;
+	std::vector<std::vector<std::pair<size_t, size_t>>> forwards, backwards;
+	// std::vector<std::vector<size_t>> backwards;
 
 	template <typename LengthType, typename ScoreType, typename Word>
 	friend class GraphAligner;
