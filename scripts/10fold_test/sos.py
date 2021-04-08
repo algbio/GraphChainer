@@ -8,42 +8,28 @@ import statistics
 import numpy as np
 
 
-Graph = "/mnt/c/Code/Summer/GCimplements/data/LRC/LRC.gfa"
-Data = "/mnt/d/summer/data/"
-Gams = "/mnt/d/summer/gams/"
-Csvs = "/mnt/d/summer/csvs/"
-Soss = "/mnt/d/summer/csvs/sos_cache/"
-verbose = True
+Graphs = ["/mnt/c/Code/Summer/GCimplements/data/LRC/LRC.vg", "/mnt/c/Code/Summer/GCimplements/data/MHC/MHC1.vg"]
+Graph = "/mnt/c/Code/Summer/GCimplements/data/LRC/LRC.vg"
+Data = "./data/"
+Gams = "./gams/"
+Csvs = "./csvs/"
+Soss = "./csvs/sos_cache/"
+Pngs = "./pngs/"
+verbose = 1
 force_redo_output = True
 
 if not os.path.exists(Csvs):
     os.system(f"mkdir -p {Csvs}")
 if not os.path.exists(Soss):
     os.system(f"mkdir -p {Soss}")
-
-def LoadGfaGraph(filename):
-	VL, E = {}, {}
-	for line in open(filename).readlines():
-		if line[0] == 'S':
-			# S 92533   A
-			i, s = line[1:].strip().split()
-			VL[int(i)] = s
-		elif line[0] == 'L':
-			# L 104890  +   104892  +   0M
-			li, lr, ri, rr, ov = line[1:].strip().split()
-			li, ri = int(li), int(ri)
-			if li not in E:
-				E[li] = []
-			E[li].append(ri)
-	return VL, E
-
-VL, E = LoadGfaGraph(Graph)
+if not os.path.exists(Pngs):
+    os.system(f"mkdir -p {Pngs}")
 
 
 ed_global = lambda s1, s2 : edlib.align(s1, s2, mode='NW')['editDistance']
 ed_local = lambda s1, s2 : edlib.align(s1, s2, mode='HW')['editDistance']
 list2idx = lambda a: { a[i] : i for i in range(len(a)) }
-revc = lambda s: ''.join({"A":"T","T":"A","C":"G","G":"C"}[c] for c in s[::-1])
+revc = lambda s: ''.join({"A":"T","T":"A","C":"G","G":"C", "N":"N"}[c] for c in s[::-1])
 
 import vg_pb2
 import gzip
@@ -86,16 +72,18 @@ def parse_alignment(aln):
 	seq = ''
 
 	rev_cnt = 0
+	path = []
 	for x in aln.path.mapping:
 		idx = x.position.node_id
 		ll = VL[idx]
+		path.append(idx)
 		if x.position.is_reverse:
 			rev_cnt += 1
 			seq += revc(ll)
 		else:
 			seq += ll
-	# return {'name':name, 'seq':seq, 'path_cnt':len(aln.path.mapping), 'revcnt':rev_cnt, 'path_bps':len(seq)}
-	return (name, seq, len(aln.path.mapping), rev_cnt, len(seq))
+	# return {'name':name, 'seq':seq, 'path_cnt':len(aln.path.mapping), 'revcnt':rev_cnt, 'path_bps':len(seq), 'path':path}
+	return (name, seq, len(aln.path.mapping), rev_cnt, len(seq), path)
 
 def parse_gam(filename):
 	ret = {}
@@ -111,6 +99,55 @@ def lazy_load_gam(name):
 		gams_all[name] = parse_gam(f"{Gams}/{name}.gam")
 	return gams_all[name]
 
+
+
+def LoadGfaGraph(filename):
+	VL, E = {}, {}
+	for line in open(filename).readlines():
+		if line[0] == 'S':
+			# S 92533   A
+			i, s = line[1:].strip().split()
+			VL[int(i)] = s
+		elif line[0] == 'L':
+			# L 104890  +   104892  +   0M
+			li, lr, ri, rr, ov = line[1:].strip().split()
+			li, ri = int(li), int(ri)
+			if li not in E:
+				E[li] = []
+			E[li].append(ri)
+	return VL, E
+def LoadVgGraph(filename):
+	VL, E = {}, {}
+	fin = open(Graph, 'rb')
+	buf = gzip.GzipFile(fileobj=fin).read()
+	n = 0
+	while n < len(buf):
+		ll, n = _DecodeVarint32(buf, n)
+		# print(ll, n)
+		ll, n = _DecodeVarint32(buf, n)
+		# print(ll, n)
+		g = vg_pb2.Graph()
+		g.ParseFromString(buf[n:n+ll])
+		n += ll
+		for i in range(len(g.node)):
+			VL[g.node[i].id] = g.node[i].sequence
+		for i in range(len(g.edge)):
+			# li = g.edge[i].from
+			li = int(str(g.edge[0]).split('\n')[0].split()[1])
+			ri = g.edge[i].to
+			if li not in E:
+				E[li] = []
+			E[li].append(ri)
+	return VL, E
+VL, E = {}, {}
+if Graph.endswith('.vg'):
+	VL, E = LoadVgGraph(Graph)
+elif Graph.endswith('.gfa'):
+	VL, E = LoadGfaGraph(Graph)
+else:
+	print('unknown grpah format', Graph)
+	exit(1)
+
 def read_fastq(fastq_filename):
 	reads_lines = open(fastq_filename).readlines()
 	for i, line in enumerate(reads_lines):
@@ -125,7 +162,8 @@ def lazy_load_fastq(name):
 	if name not in datasets_all:
 		reads = {info.split()[0][1:] : (seq, info) for info, seq in read_fastq(f"{Data}/{name}.fastq")}
 		ref = open(f"{Data}/{name}.fasta").readlines()[-1].strip()
-		datasets_all[name] = (reads, ref)
+		path = [int(s.strip().split()[1])//2 for s in open(f"{Data}/{name}.path.txt").readlines()]
+		datasets_all[name] = (reads, ref, path)
 	return datasets_all[name]
 
 log_time_all = {}
@@ -137,6 +175,7 @@ def lazy_load_time(name):
 		# id = graph + '_' + str(idx)
 		lines = open(f"./{id}.log.txt").readlines()
 		now = None
+		pm, ut, st = '', '', ''
 		for i, line in enumerate(lines):
 			if line.startswith("Co-linear chaining"):
 				if line.startswith("Co-linear chaining on splits="):
@@ -153,6 +192,19 @@ def lazy_load_time(name):
 				if not (now is None):
 					log_time_all[now] = (pm, ut, st)
 				now = None
+			elif 'User time (seconds): ' in line:
+				ut = line.split(':')[1].strip()
+			elif 'System time (seconds): ' in line:
+				st = line.split(':')[1].strip()
+			elif 'Maximum resident set size (kbytes): ' in line:
+				pm = line.split(':')[1].strip()
+				pm = '%.2f' % ( float(pm) / 1024 )
+			elif 'Exit status: ' in line:
+				if not (now is None):
+					log_time_all[now] = (pm, ut, st)
+				now = None
+
+
 	return log_time_all[name]
 
 
@@ -163,7 +215,7 @@ def lazy_load_eds(name):
 		eds = {}
 		cache = f"{Soss}/{name}_ed.csv"
 		if os.path.exists(cache):
-			if verbose:
+			if verbose >= 1:
 				print('load eds', name)
 			for line in open(cache).readlines()[1:]:
 				ss = line.strip().split(',')
@@ -172,13 +224,14 @@ def lazy_load_eds(name):
 				eds[id] = row
 
 		else:
-			if verbose:
+			if verbose >= 1:
 				print('compute eds', name)
 			gam = lazy_load_gam(name)
 			reads_name = "_".join(name.split('_')[:2])
-			reads, ref_seq = lazy_load_fastq(reads_name)
+			reads, ref_seq, ref_path = lazy_load_fastq(reads_name)
+			ref_path_nodes = set(ref_path)
 			cf = open(cache, 'w')
-			cf.write('id,len,aln_len,ed_read,ed_true\n')
+			cf.write('id,len,aln_len,ed_read,ed_true,overlap\n')
 			for id in reads:
 				read_seq, info = reads[id]
 				true_seq = ''
@@ -189,13 +242,16 @@ def lazy_load_eds(name):
 					true_seq = ref_seq[s : t + 1]
 
 				long_seq = ''
+				overlap = 0
 				if id in gam:
 					a = gam[id]
 					long_seq = a[1] #a['seq']
+					overlap = sum(len(VL[x]) for x in a[5] if x in ref_path_nodes)
 				row = []
 				row.append(len(long_seq))
 				row.append(ed_global(read_seq, long_seq))
 				row.append(ed_global(true_seq, long_seq))
+				row.append(overlap)
 
 				eds[id] = row
 				cf.write(','.join([id] + list(map(str, [len(read_seq)] + row))) + '\n')
@@ -227,12 +283,12 @@ def asmlr(vals):
 	return a, s, m, l, r
 done = set()
 def analyze(f):
-	if verbose:
+	if verbose > 1:
 		print('analyze', f)
 	# LRC_0_clc_150_31_1000.gam
 	name =  f.split('/')[-1].split('.')[0]
 	reads_name = "_".join(name.split('_')[:2])
-	reads, ref_seq = lazy_load_fastq(reads_name)
+	reads, ref_seq, ref_path = lazy_load_fastq(reads_name)
 	graph, idx, _, L, S, G = name.split('_')
 	long_name = f"{graph}_{idx}_long"
 	long_eds = lazy_load_eds(long_name)
@@ -248,7 +304,7 @@ def analyze(f):
 		rough_better_cnt = 0
 		for id in ids:
 			ll = len(reads[id][0])
-			l, r, t = eds[id]
+			l, r, t, o = eds[id]
 			leds.append(l / ll)
 			reds.append(r / ll)
 			teds.append(t / ll)
@@ -263,7 +319,7 @@ def analyze(f):
 			row += get_vals(long_eds, ids)
 			sos_out.write(','.join(map(str, row)) + '\n')
 			sos_out.flush()
-			if verbose:
+			if verbose >= 2:
 				print(','.join(map(str, row)))
 		done.add(long_name)
 
@@ -273,13 +329,15 @@ def analyze(f):
 		row += get_vals(clcs_eds, ids)
 		sos_out.write(','.join(map(str, row)) + '\n')
 		sos_out.flush()
-		if verbose:
+		if verbose >= 2:
 			print(','.join(map(str, row)))
 
 if True:
 	todo = []
 	for f in os.listdir(f"{Gams}"):
 		if 'clc' not in f:
+			continue
+		if '150_150_10000' not in f:
 			continue
 		if f not in done:
 			todo.append((f, os.stat(f"{Gams}/{f}").st_size))
@@ -342,14 +400,12 @@ sosos_out.close()
 
 #### xxplots
 import matplotlib.pyplot as plt
-Pngs = "/mnt/d/summer/pngs/"
-if not os.path.exists(Pngs):
-    os.system(f"mkdir -p {Pngs}")
 sepstrs = ['0.3', '0.1', '0.01']
 seps = [float(s) for s in sepstrs]
 plots_done = set()
 stys = ['bo', 'rx', 'g^', 'pd']
 mem = {}
+eds_done = {}
 for g in done:
 	if '_long' in g:
 		continue
@@ -372,19 +428,19 @@ for g in done:
 			continue
 		name =  f.split('/')[-1].split('.')[0]
 		reads_name = "_".join(name.split('_')[:2])
-		reads, ref_seq = lazy_load_fastq(reads_name)
+		reads, ref_seq, ref_path = lazy_load_fastq(reads_name)
 		graph, idx, _, L, S, G = name.split('_')
 		long_name = f"{graph}_{idx}_long"
 		long_eds = lazy_load_eds(long_name)
 		clcs_eds = lazy_load_eds(name)
-		#         0          1          2           3             4       5           6              7              
-		# [[ len(read),  len(aln),ed(aln,read),ed(aln,true),  len(aln),ed(aln,read),ed(aln,true),  errs ]]
-		eds = np.ndarray((len(reads), 8)) 
+		#         0          1          2           3      4      5           6              7      8     9   
+		# [[ len(read),  len(aln),ed(aln,read),ed(aln,true),ov,  len(aln),ed(aln,read),ed(aln,true),ov,  errs ]]
+		eds = np.ndarray((len(reads), 10)) 
 		eds_idx = 0
 		for id in reads:
 			total_reads += 1
 			ll = len(reads[id][0])
-			l, r, t = clcs_eds[id]
+			l, r, t, ov = clcs_eds[id]
 			now = [ll] + clcs_eds[id] + long_eds[id]
 			# leds.append(l / ll)
 			# reds.append(r / ll)
@@ -410,12 +466,13 @@ for g in done:
 		all_eds.append(eds)
 	
 	eds = np.concatenate(all_eds)
-	for i in range(1, 7):
+	for i in range(1, 9):
 		eds[:, i] /= eds[:, 0]
+	eds_done[target] = eds
 
 	# simple plots of curve of errors
 
-	old_eds = eds[:, 5]
+	old_eds = eds[:, 6]
 	new_eds = eds[:, 2]
 	def plot_improvement(old_eds, new_eds):
 		fig, ax1 = plt.subplots()
@@ -443,15 +500,38 @@ for g in done:
 		ax2.legend(loc='upper right')
 		return fig, ax1, ax2
 
-	fig, ax1, ax2 = plot_improvement(eds[:, 5], eds[:, 2])
+	fig, ax1, ax2 = plot_improvement(eds[:, 6], eds[:, 2])
 	plt.title(target.split('.')[0] + ' read edit distance improvement')
 	plt.savefig(f'{Pngs}/{target}_all_rs_curve.png')
 	plt.clf()
 
-	fig, ax1, ax2 = plot_improvement(eds[:, 6], eds[:, 3])
+	fig, ax1, ax2 = plot_improvement(eds[:, 7], eds[:, 3])
 	plt.title(target.split('.')[0] + ' true edit distance improvement')
 	plt.savefig(f'{Pngs}/{target}_all_ts_curve.png')
 	plt.clf()
+
+# eds row format:               CLC                               GA    
+#         0          1          2           3      4      5           6              7      8     9   
+# [[ len(read),  len(aln),ed(aln,read),ed(aln,true),ov,  len(aln),ed(aln,read),ed(aln,true),ov,  errs ]]
+for target in eds_done:
+	eds = eds_done[target]
+	table_out = open(f"{Csvs}/table_{target}.csv", 'w')
+	table_out.write('graph,' + ','.join([Graph.split('/')[-1]]*2) + '\n')
+	table_out.write('measure,GA,GA_p,GA+CLC,GA+CLC_p' + '\n')
+	N = eds.shape[0]
+	table_out.write('toatl_reads,%d,%d,%d,%d' % (N, N, N, N) + '\n')
+	sps = np.linspace(0,1,21)
+	ids = eds[:, 2] >= eds[:, 6]
+	eds[ids, 1:5] = eds[ids, 5:9]
+	for s in sps:
+		table_out.write('eds(read_aln)<=' + str(s) + ',%d,%.2f,%d,%.2f' % ((eds[:,6]<=s).sum(),(eds[:,6]<=s).sum()/N, (eds[:,2]<=s).sum(),(eds[:,2]<=s).sum()/N) + '\n')
+	for s in sps:
+		table_out.write('eds(true_aln)<=' + str(s) + ',%d,%.2f,%d,%.2f' % ((eds[:,7]<=s).sum(),(eds[:,7]<=s).sum()/N, (eds[:,3]<=s).sum(),(eds[:,3]<=s).sum()/N) + '\n')
+	for s in sps:
+		table_out.write('overlaps_aln>=' + str(s) + ',%d,%.2f,%d,%.2f' % ((eds[:,8]>=s).sum(),(eds[:,8]>=s).sum()/N, (eds[:,4]>=s).sum(),(eds[:,4]>=s).sum()/N) + '\n')
+
+	table_out.close()
+
 
 	# if target == '150_150_10000.gam':
 	# 	break
@@ -575,7 +655,7 @@ for g in done:
 	# mem[target + '_ls'] = ls[:]
 	# ff = lambda v: len([ x for x in v if x < 0.10 ])
 	# print(target, ss, '/', total_reads, ff(ls), ff(ws))
-	print(target, ss, '/', total_reads)
+	# print(target, ss, '/', total_reads)
 
 
 
