@@ -1151,20 +1151,23 @@ struct flowGraph {
 	}
 };
 
-std::vector<std::vector<size_t>> AlignmentGraph::shrink(const std::vector<std::vector<size_t>> &pc) {
+std::vector<std::vector<size_t>> AlignmentGraph::shrink(size_t cid, const std::vector<std::vector<size_t>> &pc) {
 	// graph should be DAG
+	const std::vector<size_t> &cids = component_ids[cid];
+	size_t N = cids.size();
+
 	std::vector<std::vector<size_t>> ret;
-	LL K = pc.size(), inf = pc.size(), N = nodeLength.size();
+	LL K = pc.size(), inf = pc.size();
 	std::vector<LL> covered(N, 0), starts(N, 0), ends(N, 0);
 	std::map<std::pair<LL, LL>, LL> edge_covered;
 	for (auto path : pc) {
 		for (LL i = 0; i < path.size(); i++) {
-			covered[path[i]]++;
+			covered[component_idx[path[i]]]++;
 			if (i > 0)
-				edge_covered[{ path[i - 1], path[i] }]++;
+				edge_covered[{ component_idx[path[i - 1]], component_idx[path[i]] }]++;
 		}
-		starts[path[0]]++;
-		ends[path.back()]++;
+		starts[component_idx[path[0]]]++;
+		ends[component_idx[path.back()]]++;
 	}
 	flowGraph fg(N * 2);
 	// i_in = i, i_out = i + N
@@ -1175,7 +1178,8 @@ std::vector<std::vector<size_t>> AlignmentGraph::shrink(const std::vector<std::v
 		fg.add_edge(j, i, cap - ff);
 	};
 	for (LL i = 0; i < N; i++)
-		for (size_t j : outNeighbors[i]) {
+		for (size_t jid : outNeighbors[cids[i]]) {
+			size_t j = component_idx[jid];
 			LL ff = edge_covered.count({i, j}) ? edge_covered[{i, j}] : 0;
 			add(i + N, j, inf, 0, ff);
 		}
@@ -1235,7 +1239,7 @@ std::vector<std::vector<size_t>> AlignmentGraph::shrink(const std::vector<std::v
 		std::vector<size_t> tmp;
 		for (LL i = fg.S; i != fg.T; ) {
 			if (0 <= i && i < N)
-				tmp.push_back(i);
+				tmp.push_back(cids[i]);
 			LL nxt = -1;
 			for (LL e = fg.f[i]; e; e = fg.t[e]) {
 				LL j = fg.p[e];
@@ -1257,17 +1261,20 @@ std::vector<std::vector<size_t>> AlignmentGraph::shrink(const std::vector<std::v
 	return ret;
 }
 
-std::vector<std::vector<size_t>> AlignmentGraph::greedyCover() const {
+std::vector<std::vector<size_t>> AlignmentGraph::greedyCover(size_t cid) const {
+	const std::vector<size_t> &cids = component_ids[cid];
+	size_t N = cids.size();
+
 	std::vector<std::vector<size_t>> ret;
-	std::vector<size_t> covered(NodeSize(), 0);
+	std::vector<size_t> covered(N, 0);
 	size_t covered_cnt = 0;
-	std::vector<std::pair<size_t, size_t>> d(NodeSize());
-	std::vector<size_t> incd(NodeSize()), Q(NodeSize());
+	std::vector<std::pair<size_t, size_t>> d(N);
+	std::vector<size_t> incd(N), Q(N);
 	while (covered_cnt < covered.size()) {
 		size_t Qsize = 0;
-		for (size_t i = 0; i < NodeSize(); i++) {
+		for (size_t i = 0; i < N; i++) {
 			d[i] = std::make_pair(0, i);
-			incd[i] = inNeighbors[i].size();
+			incd[i] = inNeighbors[cids[i]].size();
 			if (incd[i] == 0)
 				Q[Qsize++] = i;
 		}
@@ -1277,7 +1284,8 @@ std::vector<std::vector<size_t>> AlignmentGraph::greedyCover() const {
 			if (covered[s] == 0)
 				d[s].first++;
 			best = std::max(best, {d[s].first, s});
-			for (size_t t : outNeighbors[s]) {
+			for (size_t tid : outNeighbors[cids[s]]) {
+				size_t t = component_idx[tid];
 				incd[t]--;
 				d[t] = std::max(d[t], {d[s].first, s});
 				if (incd[t] == 0)
@@ -1293,53 +1301,59 @@ std::vector<std::vector<size_t>> AlignmentGraph::greedyCover() const {
 		while (covered[tmp[r]]) r--;
 		size_t new_covered = 0;
 		for (size_t i = l; i <= r; i++) {
-			path.push_back(tmp[i]);
+			path.push_back(cids[tmp[i]]);
 			if (covered[tmp[i]] == 0)
 				new_covered++;
 			covered[tmp[i]]++;
 		}
 		covered_cnt += new_covered;
-		std::cout << "path #" << mpc.size() << " : " << path.size() << " " << new_covered << " " << (NodeSize() - covered_cnt) << std::endl;
+		std::cout << "cid = " << cid << " path #" << mpc.size() << " : " << path.size() << " " << new_covered << " " << (N - covered_cnt) << std::endl;
 		ret.push_back(path);
 	}
 	return ret;
 }
 
-void AlignmentGraph::computeMPCIndex(const std::vector<std::vector<size_t>> &pc) {
+void AlignmentGraph::computeMPCIndex(size_t cid, const std::vector<std::vector<size_t>> &pc) {
+	const std::vector<size_t> &cids = component_ids[cid];
+	size_t N = cids.size();
+
 	std::vector<std::vector<LL>> last2reach;
-	LL K = pc.size(), N = NodeSize();
-	forwards.resize(N);
-	backwards.resize(N);
+	LL K = pc.size();
+	// forwards[cid].resize(N);
+	backwards[cid].resize(N);
 	last2reach.resize(N, std::vector<LL>(K, -1));
-	paths.resize(N);
+	paths[cid].resize(N);
 	for (LL i = 0; i < K; i++)
 		for (LL j = 0; j < pc[i].size(); j++) {
-			last2reach[pc[i][j]][i] = j;
-			paths[pc[i][j]].push_back(i);
+			size_t x = component_idx[pc[i][j]];
+			last2reach[x][i] = j;
+			paths[cid][x].push_back(i);
 		}
 	
 	std::vector<LL> incd(N, 0), Q;
 	for (LL i = 0; i < N; i++) {
-		incd[i] = inNeighbors[i].size();
+		incd[i] = inNeighbors[cids[i]].size();
 		if (incd[i] == 0)
 			Q.push_back(i);
 	}
-	topo_ids.clear();
-	topo_ids.resize(N);
-	topo.clear();
+	topo_ids[cid].clear();
+	topo_ids[cid].resize(N);
+	topo[cid].clear();
 	for (LL i = 0; i < Q.size(); ) {
 		LL s = Q[i++];
-		for (size_t t : outNeighbors[s]) {
+		for (size_t tid : outNeighbors[cids[s]]) {
+			size_t t = component_idx[tid];
 			incd[t]--;
 			if (incd[t] == 0)
 				Q.push_back(t);
 		}
-		topo_ids[s] = topo.size();
-		topo.push_back(s);
+		topo_ids[cid][s] = topo[cid].size();
+		topo[cid].push_back(s);
 	}
 	
 	for (LL i : Q) {
-		for (size_t j : outNeighbors[i]) {
+		for (size_t jid : outNeighbors[cids[i]]) {
+			size_t j = component_idx[jid];
 			for (LL k = 0; k < K; k++)
 				last2reach[j][k] = std::max(last2reach[j][k], last2reach[i][k]);
 		}
@@ -1347,12 +1361,14 @@ void AlignmentGraph::computeMPCIndex(const std::vector<std::vector<size_t>> &pc)
 	for (LL i = 0; i < N; i++)
 		for (LL k = 0; k < K; k++) {
 			LL &idx = last2reach[i][k];
-			if (idx != -1 && pc[k][idx] == i)
+			size_t x = component_idx[pc[k][idx]];
+			if (idx != -1 && x == i)
 				idx--;
+			x = component_idx[pc[k][idx]];
 			if (idx != -1) {
-				idx = pc[k][idx];
-				forwards[idx].push_back({ i, k });
-				backwards[i].push_back({idx, k});
+				idx = x;
+				// forwards[cid][idx].push_back({ i, k });
+				backwards[cid][i].push_back({idx, k});
 			}
 		}
 	// for (LL i = 0; i < N; i++) {
@@ -1400,13 +1416,58 @@ bool AlignmentGraph::checkMinPathCover(const std::vector<std::vector<size_t>> &p
 	return true;
 }
 
+void AlignmentGraph::buildComponentsMap() {
+	component_map.clear();
+	component_idx.clear();
+	component_ids.clear();
+	LL N = NodeSize();
+	component_map.resize(N, N+1);
+	component_idx.resize(N, N+1);
+	std::vector<size_t> Q;
+	for (size_t S = 0; S < N; S++) {
+		if (component_map[S] != N + 1)
+			continue;
+		Q.clear();
+		Q.push_back(S);
+		size_t c = component_ids.size();
+		component_map[S] = c;
+		component_idx[S] = 0;
+		for (size_t i = 0; i < Q.size(); ) {
+			size_t s = Q[i++];
+			for (size_t t : outNeighbors[s])
+				if (component_map[t] == N + 1) {
+					component_map[t] = c;
+					component_idx[t] = Q.size();
+					Q.push_back(t);
+				}
+			for (size_t t : inNeighbors[s])
+				if (component_map[t] == N + 1) {
+					component_map[t] = c;
+					component_idx[t] = Q.size();
+					Q.push_back(t);
+				}
+		}
+		component_ids.push_back(Q);
+	}
+}
+
 void AlignmentGraph::buildMPC() {
 	std::cout << "Build MPC Index" << std::endl;
-	mpc = greedyCover();
-	std::cout << "greedy width " << mpc.size() << std::endl;
-	mpc = shrink(mpc);
-	std::cout << "optimal width " << mpc.size() << std::endl;
-	computeMPCIndex(mpc);
+	buildComponentsMap();
+	std::cout << component_ids.size() << " connected components" << std::endl;
+	mpc.resize(component_ids.size());
+	topo.resize(mpc.size());
+	topo_ids.resize(mpc.size());
+	paths.resize(mpc.size());
+	// forwards.resize(mpc.size());
+	backwards.resize(mpc.size());
+	for (size_t cid = 0; cid < component_ids.size(); cid++) {
+		mpc[cid] = greedyCover(cid);
+		std::cout << "greedy width " << mpc[cid].size() << std::endl;
+		mpc[cid] = shrink(cid, mpc[cid]);
+		std::cout << "optimal width " << mpc.size() << std::endl;
+		computeMPCIndex(cid, mpc[cid]);
+	}
 	std::cout << "MPC building done" << std::endl;
 	// std::cout << checkMinPathCover(mpc) << std::endl;
 }
@@ -1625,6 +1686,31 @@ struct Treap {
 };
 
 std::vector<size_t> AlignmentGraph::colinearChaining(const std::vector<Anchor> &A, long long sep_limit) const {
+	std::vector<std::pair<size_t, size_t>> cs(A.size());
+	for (size_t i = 0; i < A.size(); i++) {
+		cs[i].first = component_map[A[i].path.back()];
+		cs[i].second = i;
+	}
+	std::sort(cs.begin(), cs.end());
+	std::vector<size_t> aids;
+	std::pair<std::vector<size_t>, size_t> best, tmp;
+	bool first = true;
+	for (size_t i = 0, j; i < cs.size(); ) {
+		aids.clear();
+		for (j = i; j < cs.size() && cs[j].first == cs[i].first; j++)
+			aids.push_back(cs[j].second);
+		tmp = colinearChainingByComponent(cs[i].first, A, aids, sep_limit);
+		// std::cerr << "cid " << cs[i].first << " " << aids.size() << " / " << A.size() << " : " << tmp.second << std::endl;
+		if (first || tmp.second > best.second) {
+			first = false;
+			best = tmp;
+		}
+		i = j;
+	}
+	return best.first;
+}
+
+std::pair<std::vector<size_t>, size_t> AlignmentGraph::colinearChainingByComponent(size_t cid, const std::vector<Anchor> &A, const std::vector<size_t> &aids, long long sep_limit) const {
 	typedef long long LL;
 	auto getSortedMap = [&](std::vector<LL> a) {
 		std::sort(a.begin(), a.end());
@@ -1634,25 +1720,33 @@ std::vector<size_t> AlignmentGraph::colinearChaining(const std::vector<Anchor> &
 			ret[a[i]] = i;
 		return ret;
 	};
+	const std::vector<size_t> &cids = component_ids[cid];
+	size_t N = cids.size();
 
-	LL K = mpc.size(), N = NodeSize();
+	LL K = mpc[cid].size();
 	std::pair<LL, LL> defaul_value = { -N*2, -1 };
-	// std::cerr <<"defaul_value "<<defaul_value.first<<endl;
+	for (size_t j : aids) {
+		defaul_value.first -= (A[j].y + 1 - A[j].x) * 2;
+	}
+	// std::cerr <<"defaul_value "<<defaul_value.first<<std::endl;
 	typedef Treap<LL, std::pair<LL, LL>> IndexT;
 	// std::vector<SegmentTree<std::pair<LL, LL>>> T(K, SegmentTree(N, defaul_value)), I(K, SegmentTree(N, defaul_value));
 	std::vector<IndexT> T(K, IndexT(defaul_value)), I(K, IndexT(defaul_value));
 	// std::vector<std::vector<LL>> starts(N), ends(N);
 	std::vector<std::pair<LL, std::pair<LL, LL>>> endpoints;
 	std::vector<std::pair<LL, LL>> C(A.size());
-	for (LL j = 0; j < A.size(); j++) {
-		endpoints.push_back({ A[j].path[0], {j, -1} });
-		endpoints.push_back({ A[j].path.back(), {j, -2} });
-		for (std::pair<LL, LL> b : backwards[A[j].path[0]])
+	for (size_t j : aids) {
+		endpoints.push_back({ component_idx[A[j].path[0]], {j, -1} });
+		endpoints.push_back({ component_idx[A[j].path.back()], {j, -2} });
+		for (std::pair<LL, LL> b : backwards[cid][component_idx[A[j].path[0]]]) {
 			endpoints.push_back({b.first, {j, b.second}});
+			// std::cerr << "  A " << j << " back " << b.first << " " << b.second << std::endl;
+		}
 		C[j] = { A[j].y - A[j].x + 1, -1 };
+		// std::cerr << "  A " << j << " " << A[j].path[0] << " " << A[j].path[1] << " -> " << component_idx[A[j].path[0]] << " " << component_idx[A[j].path.back()] << std::endl;
 	}
 	std::sort(endpoints.begin(), endpoints.end(), [&](const std::pair<LL, std::pair<LL, LL>> &p1, const std::pair<LL, std::pair<LL, LL>> &p2){
-		return topo_ids[p1.first] < topo_ids[p2.first];
+		return topo_ids[cid][p1.first] < topo_ids[cid][p2.first];
 	});
 	// for (LL vidx = 0; vidx < N; vidx++) {
 	// 	LL v = topo[vidx];
@@ -1663,6 +1757,7 @@ std::vector<size_t> AlignmentGraph::colinearChaining(const std::vector<Anchor> &
 		ridx = vidx + 1;
 		while (ridx < endpoints.size() && endpoints[ridx].first == v)
 			ridx++;
+		// std::cerr <<"now v="<<v<< " topoidx "<< topo_ids[cid][v] << " " << vidx << " " << ridx << "  " << std::endl;
 		std::vector<LL> ids;
 		for (size_t j = vidx; j < ridx; j++)
 			if (endpoints[j].second.second < 0)
@@ -1687,13 +1782,15 @@ std::vector<size_t> AlignmentGraph::colinearChaining(const std::vector<Anchor> &
 			// IndexT tmpT(Size, defaul_value), tmpI(Size, defaul_value);
 			IndexT tmpT(defaul_value), tmpI(defaul_value);
 			for (LL j : ids) {
-				if (A[j].path[0] == v) {
+				if (component_idx[A[j].path[0]] == v) {
 					std::pair<LL, LL> q = tmpT.RMQ(id_map[0], id_map[A[j].x - 1]);
+					// if (q.second!=-1)std::cerr << "C " << j << "updates A " << C[j].first << " " << C[j].second << " <- " << A[j].y - A[j].x + 1 + q.first << " " << q.second << std::endl;
 					C[j] = std::max(C[j], {A[j].y - A[j].x + 1 + q.first, q.second});
 					q = tmpI.RMQ(id_map[A[j].x], id_map[A[j].y - 1]);
+					// if (q.second!=-1)std::cerr << "C " << j << "updates B " << C[j].first << " " << C[j].second << " <- " << A[j].y + q.first << " " << q.second << std::endl;
 					C[j] = std::max(C[j], {A[j].y + q.first, q.second});
 				}
-				if (A[j].path.back() == v) {
+				if (component_idx[A[j].path.back()] == v) {
 					tmpT.add(id_map[A[j].y], {C[j].first, j});
 					tmpI.add(id_map[A[j].y], {C[j].first - A[j].y, j});
 				}
@@ -1703,8 +1800,9 @@ std::vector<size_t> AlignmentGraph::colinearChaining(const std::vector<Anchor> &
 			if (endpoints[vi].second.second != -2)
 				continue;
 			size_t j = endpoints[vi].second.first;
-			if (v == A[j].path.back())
-				for (LL k : paths[v]) {
+			// if (v == component_idx[A[j].path.back()])std::cerr << "add to " << j << std::endl;
+			if (v == component_idx[A[j].path.back()])
+				for (LL k : paths[cid][v]) {
 					T[k].add(A[j].y, {C[j].first, j});
 					I[k].add(A[j].y, {C[j].first - A[j].y, j});
 				}
@@ -1713,15 +1811,17 @@ std::vector<size_t> AlignmentGraph::colinearChaining(const std::vector<Anchor> &
 			if (endpoints[vi].second.second < 0)
 				continue;
 			size_t j = endpoints[vi].second.first;
-			LL u = A[j].path[0], k = endpoints[vi].second.second;
+			LL u = component_idx[A[j].path[0]], k = endpoints[vi].second.second;
 			std::pair<LL, LL> q = T[k].RMQ(0, A[j].x - 1);
+			// if (q.second!=-1)std::cerr << "C " << j << "updates C " << C[j].first << " " << C[j].second << " <- " << A[j].y - A[j].x + 1 + q.first << " " << q.second << std::endl;
 			C[j] = std::max(C[j], {A[j].y - A[j].x + 1 + q.first, q.second}); 
 			q = I[k].RMQ(A[j].x, A[j].y - 1);
+			// if (q.second!=-1)std::cerr << "C " << j << "updates D " << C[j].first << " " << C[j].second << " <- " << A[j].y + q.first << " " << q.second << std::endl;
 			C[j] = std::max(C[j], {A[j].y + q.first, q.second});
 		}
 	}
 	std::pair<LL, LL> best = {0, -1};
-	for (LL j = 0; j < A.size(); j++) 
+	for (size_t j : aids) 
 		best = std::max(best, { C[j].first, j });
 	// std::cerr << "optimal coverage : " << best.first << std::endl;
 	// std::cerr << "optimal ends : " << best.second << std::endl;
@@ -1735,7 +1835,7 @@ std::vector<size_t> AlignmentGraph::colinearChaining(const std::vector<Anchor> &
 		}
 	}
 	std::reverse(ret.begin(), ret.end());
-	return ret;
+	return { ret, best.first };
 }
 
 

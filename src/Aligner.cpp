@@ -505,7 +505,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 		}
 		if (fastq == nullptr) break;
 		assertSetNoRead(fastq->seq_id);
-		// coutoutput << "Read " << fastq->seq_id << " size " << fastq->sequence.size() << "bp" << BufferedWriter::Flush;
+		// cerroutput << "eds " << fastq->seq_id << " size " << fastq->sequence.size() << "bp" <<BufferedWriter::Flush;;
 		selectionOptions.readSize = fastq->sequence.size();
 		stats.reads += 1;
 		stats.bpInReads += fastq->sequence.size();
@@ -518,7 +518,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 				break;
 			else
 				short_id += c;
-		// static std::string target_id = "1893a91a-de0e-8f4f-8e46-26305eba7ad6";
+		// static std::string target_id = "S1_299";
 		// if (!target_id.empty() && short_id != target_id) continue;
 
 		// cerroutput << tmp << "  " << fastq->seq_id << " : " << fastq->sequence.length() << BufferedWriter::Flush;
@@ -716,9 +716,19 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 				size_t firstNodeOffset, lastNodeOffset;
 				auto connectStart = std::chrono::system_clock::now();
 				int ai_idx = 0;
+				// cerroutput << short_id << " : chaining " << ids.size() << " / " << A.size() << " anchors" << BufferedWriter::Flush;
+				for (size_t ai : ids) {
+					for (size_t j =0 ; j<Apos[ai].size();j++) {
+						AlignmentGraph::MatrixPosition &p = Apos[ai][j].DPposition;
+							// if (alignmentGraph.NodeLength(p.node) <= p.nodeOffset) std::cerr << "????" << ai << " :" << j << std::endl;
+					}
+				}
 				for (size_t ai : ids) {
 					const AlignmentGraph::Anchor &anchor = A[ai];
 					// std::cerr << short_id << " : connect " << ai << " " << (ai_idx++) << "/" << ids.size() << "  " << pos_path.size() << "   longsest" << longest.size()<< std::endl;
+					// if (ai_idx>1) std::cerr << "ccc " << alignmentGraph.getChainPath(A[ids[ai_idx-2]].path.back(), A[ids[ai_idx-1]].path[0], -1).size() << std::endl;
+					// std::cerr << "now " << Apos[ai][0].DPposition.nodeOffset << "  " << Apos[ai].back().DPposition.nodeOffset << std::endl;
+					// std::cerr << "back " << Apos[ai].back().DPposition.node << " " << alignmentGraph.NodeLength(Apos[ai].back().DPposition.node) << std::endl;
 					if (pos_path.empty()) {
 						pos_path = anchor.path;
 						firstNodeOffset = Apos[ai][0].DPposition.nodeOffset;
@@ -744,6 +754,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 						if (gap) {
 							// std::cerr << "gap _gap_ " << (int)(gap) << " " << path.size() << "  " << std::endl;
 							tmp = pathToTrace(alignmentGraph, pos_path, firstNodeOffset, lastNodeOffset);
+				// cerroutput << tmp.size() << " : " << pos_path.size() << " at " << firstNodeOffset << " " << lastNodeOffset << BufferedWriter::Flush;
 							if (longest.size() < tmp.size())
 								longest.swap(tmp);
 							nodes.clear();
@@ -756,6 +767,8 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 									nodes.insert(j);
 									pos_path.push_back(j);
 								}
+						// for (size_t j : anchor.path) std::cerr << " " << j << (int)(nodes.count(j));
+						//  std::cerr << std::endl;
 						for (size_t j : anchor.path) 
 							if (!nodes.count(j)) {
 								nodes.insert(j);
@@ -766,13 +779,18 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 				}
 				if (!pos_path.empty()) {
 					tmp = pathToTrace(alignmentGraph, pos_path, firstNodeOffset, lastNodeOffset);
+					// cerroutput << tmp.size() << " : " << pos_path.size() << " at " << firstNodeOffset << " " << lastNodeOffset << BufferedWriter::Flush;
+					// cerroutput << "last " << pos_path.back() <<" " << lastNodeOffset << alignmentGraph.NodeLength(pos_path.back()) << BufferedWriter::Flush;
 					if (longest.size() < tmp.size())
 						longest.swap(tmp);
 				}
+				// cerroutput << short_id << " : chaining " << longest.size() << " bps" << BufferedWriter::Flush;
 
 				std::string pathseq = "";
 				// not convert back to original node ids, to call alignmentGraph.NodeSequences()
 				for (AlignmentGraph::MatrixPosition &p : longest) {
+				// cerroutput << p.node << " : " << p.nodeOffset << " bps " << alignmentGraph.NodeLength(p.node) << BufferedWriter::Flush;
+
 					pathseq.push_back(alignmentGraph.NodeSequences(p.node, p.nodeOffset));
 				}
 				// align by edit distance to get trace, using edlib
@@ -788,11 +806,12 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 					}
 				}
 				else {
-					EdlibAlignResult result = edlibAlign(pathseq.c_str(), pathseq.length(), fastq->sequence.c_str(), fastq->sequence.length(), edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0));
+					EdlibAlignResult result = edlibAlign(pathseq.c_str(), pathseq.length(), fastq->sequence.c_str(), fastq->sequence.length(), edlibNewAlignConfig(-1, EDLIB_MODE_NW, EDLIB_TASK_PATH, NULL, 0));
 					if (result.status != EDLIB_STATUS_OK)
 						longest.clear();
 					else {
 						alnScore = result.editDistance;
+						// std::cerr << short_id << ": eds " << result.editDistance << " from  len=" << pathseq.length()<<" " << fastq->sequence.length()<< std::endl;
 						std::vector<AlignmentGraph::MatrixPosition> trace;
 						trace.reserve(result.alignmentLength);
 						size_t start = result.startLocations[0], end = result.endLocations[0];
@@ -813,7 +832,10 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 							else if (c == 2)
 								seq_i++;
 							seq_i = std::min(seq_i, fastq->sequence.length() - 1);
+							pos_i = std::min(pos_i, longest.size() - 1);
+							
 						}
+						// cerroutput << "eds " << trace.size() << " " << longest.size() << " : " << pos_i << " / " << seq_i << BufferedWriter::Flush;;
 						longest.swap(trace);
 					}
 					edlibFreeAlignResult(result);

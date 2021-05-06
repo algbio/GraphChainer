@@ -114,6 +114,7 @@ public:
 		size_t x, y;
 	};
 	void buildMPC();
+	void buildComponentsMap();
 	void loadMPC(const std::string &filename);
 	void saveMPC(const std::string &filename);
 	std::vector<size_t> generatePath(const std::string &seq_out, const std::string &path_out, const size_t seed = 0);
@@ -131,10 +132,12 @@ private:
 	void AddNode(int nodeId, int offset, const std::string& sequence, bool reverseNode);
 	void RenumberAmbiguousToEnd();
 	void doComponentOrder();
-	std::vector<std::vector<size_t>> greedyCover() const;
-	std::vector<std::vector<size_t>> shrink(const std::vector<std::vector<size_t>> &pc);
-	void computeMPCIndex(const std::vector<std::vector<size_t>> &pc);
+
+	std::vector<std::vector<size_t>> greedyCover(size_t cid) const;
+	std::vector<std::vector<size_t>> shrink(size_t cid, const std::vector<std::vector<size_t>> &pc);
+	void computeMPCIndex(size_t cid, const std::vector<std::vector<size_t>> &pc);
 	bool checkMinPathCover(const std::vector<std::vector<size_t>> &pc);
+	std::pair<std::vector<size_t>, size_t> colinearChainingByComponent(size_t cid, const std::vector<Anchor> &anchors, const std::vector<size_t> &aids, long long sep_limit) const;
 	
 
 
@@ -160,11 +163,13 @@ private:
 	size_t DBGoverlap;
 	bool finalized;
 
-	std::vector<size_t> topo;
-	std::vector<size_t> topo_ids;
-	std::vector<std::vector<size_t>> mpc;
-	std::vector<std::vector<size_t>> paths;
-	std::vector<std::vector<std::pair<size_t, size_t>>> forwards, backwards;
+	std::vector<size_t> component_map;
+	std::vector<size_t> component_idx;
+	std::vector<std::vector<size_t>> component_ids;
+
+	std::vector<std::vector<size_t>> topo, topo_ids;
+	std::vector<std::vector<std::vector<size_t>>> mpc, paths;
+	std::vector<std::vector<std::vector<std::pair<size_t, size_t>>>> forwards, backwards;
 	// std::vector<std::vector<size_t>> backwards;
 
 	template <typename LengthType, typename ScoreType, typename Word>
