@@ -21,7 +21,7 @@ VERSION := Branch $(shell git rev-parse --abbrev-ref HEAD) commit $(shell git re
 $(shell mkdir -p bin)
 $(shell mkdir -p obj)
 
-$(BINDIR)/GraphAligner: $(ODIR)/AlignerMain.o $(OBJ) edlib/src/edlib.cpp
+$(BINDIR)/GraphChainer: $(ODIR)/AlignerMain.o $(OBJ) edlib/src/edlib.cpp
 	$(GPP) -o $@ $^ $(LINKFLAGS)
 
 $(ODIR)/GraphAlignerWrapper.o: $(SRCDIR)/GraphAlignerWrapper.cpp $(SRCDIR)/GraphAligner.h $(SRCDIR)/NodeSlice.h $(SRCDIR)/WordSlice.h $(SRCDIR)/ArrayPriorityQueue.h $(SRCDIR)/ComponentPriorityQueue.h $(SRCDIR)/GraphAlignerVGAlignment.h $(SRCDIR)/GraphAlignerGAFAlignment.h $(SRCDIR)/GraphAlignerBitvectorBanded.h $(SRCDIR)/GraphAlignerBitvectorCommon.h $(SRCDIR)/GraphAlignerCommon.h $(SRCDIR)/DijkstraQueue.h $(SRCDIR)/GraphAlignerBitvectorDijkstra.h $(DEPS)

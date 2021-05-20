@@ -1,4 +1,4 @@
-name: GraphAligner
+name: GraphChainer
 channels:
   - conda-forge
   - bioconda
