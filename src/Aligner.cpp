@@ -1091,6 +1091,10 @@ void alignReads(AlignerParams params)
 		std::vector<size_t> path = alignmentGraph.generatePath(params.fastqFiles[0], params.outputGAMFile, params.generatePathSeed);
 		return;
 	}
+	if (params.graphStatistics) {
+		alignmentGraph.buildMPC();
+		return;
+	}
 	if (params.colinearChaining) {
 		bool mpcReady = false;
 		if (params.IndexMpcFile != "" && is_file_exist(params.IndexMpcFile)) {

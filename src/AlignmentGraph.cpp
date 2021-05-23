@@ -264,21 +264,24 @@ void AlignmentGraph::Finalize(int wordSize)
 	findLinearizable();
 	doComponentOrder();
 	findChains();
-	std::cout << nodeLookup.size() << " original nodes" << std::endl;
-	std::cout << nodeLength.size() << " split nodes" << std::endl;
+	std::cout << nodeLookup.size() << " original nodes, " << (nodeLookup.size()/2) << " in one strand" << std::endl;
+	std::cout << nodeLength.size() << " split nodes, " << (nodeLength.size()/2) << " in one strand" << std::endl;
 	std::cout << ambiguousNodeSequences.size() << " ambiguous split nodes" << std::endl;
 	finalized = true;
 	int specialNodes = 0;
 	size_t edges = 0;
+	size_t bps = 0;
 	for (size_t i = 0; i < inNeighbors.size(); i++)
 	{
 		inNeighbors[i].shrink_to_fit();
 		outNeighbors[i].shrink_to_fit();
 		if (inNeighbors[i].size() >= 2) specialNodes++;
 		edges += inNeighbors[i].size();
+		bps += nodeLength[i];
 	}
-	std::cout << edges << " edges" << std::endl;
-	std::cout << specialNodes << " nodes with in-degree >= 2" << std::endl;
+	std::cout << bps << " base pairs (total characters), " << (bps/2) << " in one strand" << std::endl;
+	std::cout << edges << " edges, " << (edges/2) << " in one strand" << std::endl;
+	std::cout << specialNodes << " nodes with in-degree >= 2, " << (specialNodes/2) << " in one strand" << std::endl;
 	assert(nodeSequences.size() + ambiguousNodeSequences.size() == nodeLength.size());
 	assert(inNeighbors.size() == nodeLength.size());
 	assert(outNeighbors.size() == nodeLength.size());
@@ -1307,7 +1310,7 @@ std::vector<std::vector<size_t>> AlignmentGraph::greedyCover(size_t cid) const {
 			covered[tmp[i]]++;
 		}
 		covered_cnt += new_covered;
-		std::cout << "cid = " << cid << " path #" << mpc.size() << " : " << path.size() << " " << new_covered << " " << (N - covered_cnt) << std::endl;
+		std::cout << "cid = " << cid << " path #" << mpc[cid].size() << " : " << path.size() << " " << new_covered << " " << (N - covered_cnt) << std::endl;
 		ret.push_back(path);
 	}
 	return ret;
@@ -1361,14 +1364,13 @@ void AlignmentGraph::computeMPCIndex(size_t cid, const std::vector<std::vector<s
 	for (LL i = 0; i < N; i++)
 		for (LL k = 0; k < K; k++) {
 			LL &idx = last2reach[i][k];
-			size_t x = component_idx[pc[k][idx]];
-			if (idx != -1 && x == i)
+			if (idx != -1 && component_idx[pc[k][idx]] == i)
 				idx--;
-			x = component_idx[pc[k][idx]];
+			
 			if (idx != -1) {
-				idx = x;
+				size_t x = component_idx[pc[k][idx]];
 				// forwards[cid][idx].push_back({ i, k });
-				backwards[cid][i].push_back({idx, k});
+				backwards[cid][i].push_back({x, k});
 			}
 		}
 	// for (LL i = 0; i < N; i++) {
@@ -1461,14 +1463,19 @@ void AlignmentGraph::buildMPC() {
 	paths.resize(mpc.size());
 	// forwards.resize(mpc.size());
 	backwards.resize(mpc.size());
+	size_t tw = 0, mw = 0;
 	for (size_t cid = 0; cid < component_ids.size(); cid++) {
 		mpc[cid] = greedyCover(cid);
-		std::cout << "greedy width " << mpc[cid].size() << std::endl;
+		std::cout << "cid = " << cid << " greedy width " << mpc[cid].size() << std::endl;
 		mpc[cid] = shrink(cid, mpc[cid]);
-		std::cout << "optimal width " << mpc.size() << std::endl;
+		std::cout << "cid = " << cid << " optimal width " << mpc[cid].size() << std::endl;
 		computeMPCIndex(cid, mpc[cid]);
+		std::cout << "cid = " << cid << " MPC index done" << std::endl;
+		tw += mpc[cid].size();
+		mw = std::max(mw, mpc[cid].size());
 	}
 	std::cout << "MPC building done" << std::endl;
+	std::cout << "total width " << tw << " and max component width " << mw << std::endl;
 	// std::cout << checkMinPathCover(mpc) << std::endl;
 }
 void AlignmentGraph::loadMPC(const std::string &filename) {

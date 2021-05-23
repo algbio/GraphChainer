@@ -65,6 +65,7 @@ int main(int argc, char** argv)
 		("cigar-match-mismatch", "use M for matches and mismatches in the cigar string instead of = and X")
 		("generate-path", "generate a path and write to file instead of aligning reads from file")
 		("generate-path-seed", boost::program_options::value<long long>(), "seed for generating path")
+		("graph-statistics", "show statistics (size, width) of the input graph then exit")
 	;
 	boost::program_options::options_description seeding("Seeding");
 	seeding.add_options()
@@ -177,6 +178,7 @@ int main(int argc, char** argv)
 	params.generatePathSeed = 0;
 	params.IndexMpcFile = "";
 	params.fastMode = false;
+	params.graphStatistics = false;
 
 	std::vector<std::string> outputAlns;
 	bool paramError = false;
@@ -263,6 +265,7 @@ int main(int argc, char** argv)
 	if (vm.count("cigar-match-mismatch")) params.cigarMatchMismatchMerge = true;
 	if (vm.count("generate-path")) params.generatePath = true;
 	if (vm.count("generate-path-seed")) params.generatePathSeed = vm["generate-path-seed"].as<long long>();
+	if (vm.count("graph-statistics")) params.graphStatistics = true;
 
 	int resultSelectionMethods = 0;
 	if (vm.count("all-alignments"))
