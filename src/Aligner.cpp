@@ -717,6 +717,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 				auto connectStart = std::chrono::system_clock::now();
 				int ai_idx = 0;
 				// cerroutput << short_id << " : chaining " << ids.size() << " / " << A.size() << " anchors" << BufferedWriter::Flush;
+				int one_node_overlaps_tmp = 0, one_node_overlaps_now = 0, one_node_overlaps_all = 0;
 				for (size_t ai : ids) {
 					for (size_t j =0 ; j<Apos[ai].size();j++) {
 						AlignmentGraph::MatrixPosition &p = Apos[ai][j].DPposition;
@@ -737,6 +738,10 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 							nodes.insert(j);
 					}
 					else {
+						if (anchor.path[0] == pos_path.back()) {
+							one_node_overlaps_tmp++;
+							one_node_overlaps_all++;
+						}
 						bool gap = anchor.path[0] == pos_path.back() && params.colinearGap != -1 && (long long)Apos[ai][0].DPposition.nodeOffset - (long long)lastNodeOffset > params.colinearGap + 1;
 						if (gap) {
 							// std::cerr << " ? " << anchor.path[0] << " to " << pos_path.back() << " : " << Apos[ai][0].DPposition.nodeOffset << " " << lastNodeOffset << " || " << Apos[ai][0].DPposition.node << std::endl;
@@ -755,8 +760,10 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 							// std::cerr << "gap _gap_ " << (int)(gap) << " " << path.size() << "  " << std::endl;
 							tmp = pathToTrace(alignmentGraph, pos_path, firstNodeOffset, lastNodeOffset);
 				// cerroutput << tmp.size() << " : " << pos_path.size() << " at " << firstNodeOffset << " " << lastNodeOffset << BufferedWriter::Flush;
-							if (longest.size() < tmp.size())
+							if (longest.size() < tmp.size()) {
 								longest.swap(tmp);
+								one_node_overlaps_now = one_node_overlaps_tmp;
+							}
 							nodes.clear();
 							pos_path.clear();
 							firstNodeOffset = Apos[ai][0].DPposition.nodeOffset;
@@ -781,8 +788,10 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 					tmp = pathToTrace(alignmentGraph, pos_path, firstNodeOffset, lastNodeOffset);
 					// cerroutput << tmp.size() << " : " << pos_path.size() << " at " << firstNodeOffset << " " << lastNodeOffset << BufferedWriter::Flush;
 					// cerroutput << "last " << pos_path.back() <<" " << lastNodeOffset << alignmentGraph.NodeLength(pos_path.back()) << BufferedWriter::Flush;
-					if (longest.size() < tmp.size())
+					if (longest.size() < tmp.size()) {
 						longest.swap(tmp);
+						one_node_overlaps_now = one_node_overlaps_tmp;
+					}
 				}
 				// cerroutput << short_id << " : chaining " << longest.size() << " bps" << BufferedWriter::Flush;
 
@@ -868,6 +877,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 					<< "chained " << ids.size() << " / " << A.size() << " anchors, actual " << longest.size() << " bps, "
 					<< "time " << anchorsms << " " << clcms << " " << connectms << "  "
 					<< "score=" << alnScore// << " better? " << (better?"Yes":"No") 
+					<< " one_node_overlaps=" << one_node_overlaps_now << " / " << one_node_overlaps_all
 					<< BufferedWriter::Flush;
 
 				// compare alignments
