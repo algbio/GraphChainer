@@ -84,8 +84,8 @@ int main(int argc, char** argv)
 		("DP-restart-stride", boost::program_options::value<size_t>(), "if --seedless-DP doesn't span the entire read, restart after arg base pairs (int)")
 		("colinear-chaining", "use co-linear chaining to cluster seeds")
 		("colinear-gap", boost::program_options::value<long long>(), "max gap distance between adjacent anchors (default 10000)")
-		("colinear-split-len", boost::program_options::value<long long>(), "splited short read lengths [default 150]")
-		("colinear-split-gap", boost::program_options::value<long long>(), "splited short read gaps [default 150]")
+		("colinear-split-len", boost::program_options::value<long long>(), "splited short read lengths [default 50]")
+		("colinear-split-gap", boost::program_options::value<long long>(), "splited short read gaps [default 50]")
 		("mpc-index,i", boost::program_options::value<std::string>(), "minimium path cover index filename")
 		("fast-mode", "skip edit distance computation after chaining (output the path instead of alignment)")
 	;
@@ -222,8 +222,8 @@ int main(int argc, char** argv)
 		params.alignmentSelectionMethod = AlignmentSelection::SelectionMethod::All;
 		params.tryAllSeeds = true;
 		params.colinearGap = 10000;
-		params.colinearSplitLen = 150;
-		params.colinearSplitGap = 150;
+		params.colinearSplitLen = 50;
+		params.colinearSplitGap = 50;
 	}
 
 	if (vm.count("graph")) params.graphFile = vm["graph"].as<std::string>();
