@@ -896,6 +896,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 					<< "chained " << ids.size() << " / " << A.size() << " anchors, actual " << longest.size() << " bps, "
 					<< "time " << anchorsms << " " << clcms << " " << connectms << "  "
 					<< "score=" << alnScore// << " better? " << (better?"Yes":"No") 
+					<< " long_edit_distance=" << long_edit_distance
 					<< " one_node_overlaps=" << one_node_overlaps_now << " / " << one_node_overlaps_all
 					<< BufferedWriter::Flush;
 
