@@ -82,7 +82,7 @@ int main(int argc, char** argv)
 		("seeds-file,s", boost::program_options::value<std::vector<std::string>>()->multitoken(), "external seeds (.gam)")
 		("seedless-DP", "no seeding, instead use DP alignment algorithm for the entire first row. VERY SLOW except on tiny graphs")
 		("DP-restart-stride", boost::program_options::value<size_t>(), "if --seedless-DP doesn't span the entire read, restart after arg base pairs (int)")
-		("colinear-chaining", "use co-linear chaining to cluster seeds [default true]")
+		("no-colinear-chaining", "do not use co-linear chaining to cluster seeds")
 		("colinear-gap", boost::program_options::value<long long>(), "max gap distance between adjacent anchors (default 10000)")
 		("colinear-split-len", boost::program_options::value<long long>(), "splited short read lengths [default 35]")
 		("colinear-split-gap", boost::program_options::value<long long>(), "splited short read gaps [default 35]")
@@ -218,7 +218,7 @@ int main(int argc, char** argv)
 	if (vm.count("fast-mode"))
 		params.fastMode = true;
 	
-	if (params.colinearChaining)
+	if (!vm.count("no-colinear-chaining"))
 	{
 		params.alignmentSelectionMethod = AlignmentSelection::SelectionMethod::All;
 		params.tryAllSeeds = true;
@@ -247,7 +247,7 @@ int main(int argc, char** argv)
 	if (vm.count("seeds-mum-count")) params.mumCount = vm["seeds-mum-count"].as<size_t>();
 	if (vm.count("seeds-mxm-cache-prefix")) params.seederCachePrefix = vm["seeds-mxm-cache-prefix"].as<std::string>();
 	if (vm.count("seedless-DP")) params.dynamicRowStart = true;
-	// if (vm.count("colinear-chaining")) params.colinearChaining = true;
+	if (vm.count("no-colinear-chaining")) params.colinearChaining = false;
 	if (vm.count("colinear-gap")) params.colinearGap = vm["colinear-gap"].as<long long>();
 	if (vm.count("colinear-split-len")) params.colinearSplitLen = vm["colinear-split-len"].as<long long>();
 	if (vm.count("colinear-split-gap")) params.colinearSplitGap = vm["colinear-split-gap"].as<long long>();
