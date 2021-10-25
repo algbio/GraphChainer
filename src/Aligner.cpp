@@ -601,9 +601,9 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 		if (params.colinearChaining) {
 			// The obsolete code below ran CLC only for 'bad' GA alignments
 			// check whether colinear is necessary
-			bool necessary = true;
-			AlignmentResult long_alignments;
-			size_t long_edit_distance;
+			// bool necessary = true;
+			// AlignmentResult long_alignments;
+			// size_t long_edit_distance;
 			// long_alignments = align_fn(fastq->seq_id, fastq->sequence);
 			// if (long_alignments.alignments.empty())
 			// 	necessary = true;
@@ -634,6 +634,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 			
 			if (!long_alignments.alignments.empty())
 			{
+				std::string long_pathseq = traceToSequence(alignmentGraph, long_alignments.alignments[0]);
 				EdlibAlignResult result = edlibAlign(long_pathseq.c_str(), long_pathseq.length(), fastq->sequence.c_str(), fastq->sequence.length(), edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0));
 				if (result.status != EDLIB_STATUS_OK) {
 					long_edit_distance = fastq->sequence.length();
