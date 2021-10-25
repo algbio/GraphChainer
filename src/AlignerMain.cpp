@@ -14,8 +14,8 @@ int main(int argc, char** argv)
 {
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-	std::cout << "GraphAligner " << VERSION << std::endl;
-	std::cerr << "GraphAligner " << VERSION << std::endl;
+	std::cout << "GraphChainer " << VERSION << std::endl;
+	std::cerr << "GraphChainer " << VERSION << std::endl;
 
 #ifndef NOBUILTINPOPCOUNT
 	if (__builtin_cpu_supports("popcnt") == 0)

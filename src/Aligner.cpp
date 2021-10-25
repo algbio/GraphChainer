@@ -635,7 +635,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 			if (!long_alignments.alignments.empty())
 			{
 				std::string long_pathseq = traceToSequence(alignmentGraph, long_alignments.alignments[0]);
-				EdlibAlignResult result = edlibAlign(long_pathseq.c_str(), long_pathseq.length(), fastq->sequence.c_str(), fastq->sequence.length(), edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0));
+				EdlibAlignResult result = edlibAlign(long_pathseq.c_str(), long_pathseq.length(), fastq->sequence.c_str(), fastq->sequence.length(), edlibNewAlignConfig(-1, EDLIB_MODE_NW, EDLIB_TASK_DISTANCE, NULL, 0));
 				if (result.status != EDLIB_STATUS_OK) {
 					long_edit_distance = fastq->sequence.length();
 				}
