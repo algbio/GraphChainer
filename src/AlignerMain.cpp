@@ -254,7 +254,7 @@ int main(int argc, char** argv)
 	if (vm.count("speed")) params.speed = vm["speed"].as<long long>();
 	if (vm.count("mpc-index")) params.IndexMpcFile = vm["mpc-index"].as<std::string>();
 	
-	if params.speed != 1
+	if (params.speed != 1)
 	{
 		params.colinearSplitGap = params.speed * params.colinearSplitLen;
 	}
