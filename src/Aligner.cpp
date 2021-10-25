@@ -599,6 +599,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 				continue;
 		}
 		if (params.colinearChaining) {
+			// The obsolete code below ran CLC only for 'bad' GA alignments
 			// check whether colinear is necessary
 			bool necessary = true;
 			AlignmentResult long_alignments;
@@ -624,9 +625,26 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 			// 		edlibFreeAlignResult(result);
 			// 	}
 			// }
-			if (!necessary)
-				alignments = std::move(long_alignments);
-			else if (necessary) {
+
+			// check whether colinear is necessary
+			bool necessary = true;
+			AlignmentResult long_alignments;
+			size_t long_edit_distance;
+			long_alignments = align_fn(fastq->seq_id, fastq->sequence);
+			
+			if (!long_alignments.alignments.empty())
+			{
+				EdlibAlignResult result = edlibAlign(long_pathseq.c_str(), long_pathseq.length(), fastq->sequence.c_str(), fastq->sequence.length(), edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0));
+				if (result.status != EDLIB_STATUS_OK) {
+					long_edit_distance = fastq->sequence.length();
+				}
+				else {
+					long_edit_distance = result.editDistance;
+				}
+				edlibFreeAlignResult(result);
+			}
+
+			if (necessary) {
 				// start spliting long reads into short reads for anchors
 				std::vector<AlignmentGraph::Anchor> A;
 				std::vector<std::vector<GraphAlignerCommon<size_t, int32_t, uint64_t>::TraceItem>> Apos;
@@ -870,7 +888,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 				}
 				auto connectEnd = std::chrono::system_clock::now();
 				auto connectms = std::chrono::duration_cast<std::chrono::milliseconds>(connectEnd - connectStart).count();
-				// bool better = (long_alignments.alignments.empty() || long_edit_distance > alignments.alignments.back().alignmentScore);
+				bool better = (long_alignments.alignments.empty() || long_edit_distance > alignments.alignments.back().alignmentScore);
 
 				if (params.shortVerboseMode || params.verboseMode)
 					cerroutput << tmpidx << " " << short_id << " len=" << fastq->sequence.length() << " : "
@@ -881,9 +899,9 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 					<< BufferedWriter::Flush;
 
 				// compare alignments
-				// if (!better) {
-				// 	alignments = std::move(long_alignments);
-				// }
+				if (!better) {
+					alignments = std::move(long_alignments);
+				}
 			}
 		}
 
