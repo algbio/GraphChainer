@@ -58,7 +58,7 @@ int main(int argc, char** argv)
 	;
 
 	boost::program_options::options_description generalGA("General parameters from GraphAligner");
-	general.add_options()
+	generalGA.add_options()
 		("E-cutoff", boost::program_options::value<double>(), "discard alignments with E-value > arg")
 		("all-alignments", "return all alignments instead of the best non-overlapping alignments")
 		("extra-heuristic", "use heuristics to discard more seed hits")
