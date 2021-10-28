@@ -1,6 +1,6 @@
 # GraphChainer
 
-Here we will version the main project consisting on building a sequence to graph aligner based on Co-linear Chaining.
+GraphChainer is an accurate aligner of long reads to a variation graph, based on co-linear chaining.
 
 #### Compilation
 
@@ -33,6 +33,12 @@ Parameters related to colinear chaining:
 Use [vg](https://github.com/vgteam/vg) and run:
 
 `vg construct -t 30 -a -r {ref} -v {vcf} -R 22 -p -m 3000000`
+
+### Citation
+
+If you use GraphChainer, please cite as:
+
+Jun Ma, Manuel Cáceres, Leena Salmela, Veli Mäkinen, Alexandru I. Tomescu. GraphChainer: Co-linear Chaining for Accurate Sequence-to-Variation-Graph Alignment. Submitted, 2021
 
 ### Credits
 
