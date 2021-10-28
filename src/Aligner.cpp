@@ -528,7 +528,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 		size_t clustertimems = 0;
 		bool cont = false;
 		// auto align_fn = [&seeder, &alignments, &reusableState, &alntimems, &clustertimems, &stats, &coutoutput, &cerroutput, &error, &params, &alignmentGraph] (const std::string &seq_id, const std::string &sequence) {
-		auto align_fn = [&] (const std::string &seq_id, const std::string &sequence) {
+		auto align_fn = [&] (const std::string &seq_id, const std::string &sequence, const bool &tryAllSeeds) {
 			AlignmentResult alignments;
 			try
 			{
@@ -562,7 +562,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 						clustertimems = std::chrono::duration_cast<std::chrono::milliseconds>(clusterTimeEnd - clusterTimeStart).count();
 						coutoutput << "Read " << seq_id << " clustering took " << clustertimems << "ms" << BufferedWriter::Flush;
 						auto alntimeStart = std::chrono::system_clock::now();
-						alignments = AlignOneWay(alignmentGraph, seq_id, sequence, params.initialBandwidth, params.rampBandwidth, params.maxCellsPerSlice, !params.verboseMode, !params.tryAllSeeds, seeds, reusableState, !params.highMemory, params.forceGlobal, params.preciseClipping, params.seedClusterMinSize, params.seedExtendDensity, params.nondeterministicOptimizations, params.preciseClippingIdentityCutoff, params.Xdropcutoff);
+						alignments = AlignOneWay(alignmentGraph, seq_id, sequence, params.initialBandwidth, params.rampBandwidth, params.maxCellsPerSlice, !params.verboseMode, tryAllSeeds, seeds, reusableState, !params.highMemory, params.forceGlobal, params.preciseClipping, params.seedClusterMinSize, params.seedExtendDensity, params.nondeterministicOptimizations, params.preciseClippingIdentityCutoff, params.Xdropcutoff);
 						auto alntimeEnd = std::chrono::system_clock::now();
 						alntimems = std::chrono::duration_cast<std::chrono::milliseconds>(alntimeEnd - alntimeStart).count();
 					}
@@ -594,7 +594,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 		};
 		
 		if (!params.colinearChaining) {
-			alignments = align_fn(fastq->seq_id, fastq->sequence);
+			alignments = align_fn(fastq->seq_id, fastq->sequence, params.tryAllSeeds);
 			if (cont)
 				continue;
 		}
@@ -630,7 +630,10 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 			bool necessary = true;
 			AlignmentResult long_alignments;
 			size_t long_edit_distance;
-			long_alignments = align_fn(fastq->seq_id, fastq->sequence);
+			long_alignments = align_fn(fastq->seq_id, fastq->sequence, false);
+
+			// Getting the best alignment of GA
+			if (long_alignments.alignments.size() > 0) long_alignments.alignments = AlignmentSelection::SelectAlignments(long_alignments.alignments, AlignmentSelection::SelectionMethod::GreedyLength);
 			
 			if (!long_alignments.alignments.empty())
 			{
