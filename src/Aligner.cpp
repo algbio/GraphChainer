@@ -898,8 +898,12 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 				auto connectEnd = std::chrono::system_clock::now();
 				auto connectms = std::chrono::duration_cast<std::chrono::milliseconds>(connectEnd - connectStart).count();
 
-				if (alignments.alignments.size() > 0) alignments.alignments = AlignmentSelection::SelectAlignments(alignments.alignments, selectionOptions);
-				bool better = (long_alignments.alignments.empty() || long_edit_distance > alignments.alignments.front().alignmentScore);
+				bool better = false;
+				if (alignments.alignments.size() > 0) 
+				{
+					alignments.alignments = AlignmentSelection::SelectAlignments(alignments.alignments, selectionOptions);
+					better = (long_alignments.alignments.empty() || long_edit_distance > alignments.alignments.front().alignmentScore);
+				}
 
 				if (params.shortVerboseMode || params.verboseMode)
 					cerroutput << tmpidx << " " << short_id << " len=" << fastq->sequence.length() << " : "
