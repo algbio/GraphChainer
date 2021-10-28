@@ -633,7 +633,9 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 			long_alignments = align_fn(fastq->seq_id, fastq->sequence, false);
 
 			// Getting the best alignment of GA
-			if (long_alignments.alignments.size() > 0) long_alignments.alignments = AlignmentSelection::SelectAlignments(long_alignments.alignments, AlignmentSelection::SelectionMethod::GreedyLength);
+			AlignmentSelection::SelectionOptions gaSelectionOptions = selectionOptions;
+			gaSelectionOptions.method = AlignmentSelection::SelectionMethod::GreedyLength;
+			if (long_alignments.alignments.size() > 0) long_alignments.alignments = AlignmentSelection::SelectAlignments(long_alignments.alignments, gaSelectionOptions);
 			
 			if (!long_alignments.alignments.empty())
 			{
