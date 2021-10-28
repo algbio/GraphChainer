@@ -37,9 +37,17 @@ int main(int argc, char** argv)
 		("graph,g", boost::program_options::value<std::string>(), "input graph (.gfa / .vg)")
 		("reads,f", boost::program_options::value<std::vector<std::string>>()->multitoken(), "input reads (fasta or fastq, uncompressed or gzipped)")
 		("alignments-out,a", boost::program_options::value<std::vector<std::string>>(), "output alignment file (.gaf/.gam/.json)")
-		("corrected-out", boost::program_options::value<std::string>(), "output corrected reads file (.fa/.fa.gz)")
-		("corrected-clipped-out", boost::program_options::value<std::string>(), "output corrected clipped reads file (.fa/.fa.gz)")
 	;
+	boost::program_options::options_description clcparams("Colinear chaining parameters");
+	clcparams.add_options()
+		("speed", boost::program_options::value<long long>(), "Speed-up factor [default 1]; use 3 for faster, but slightly less accurate alignments")
+		("colinear-split-len", boost::program_options::value<long long>(), "The length of the fragments in which the long read is split to create anchors. [default 35]")
+		("colinear-split-gap", boost::program_options::value<long long>(), "The distance between consecutive fragments [default 35]. If --speed is set, then always --colinear-split-gap = --speed * --colinear-split-len.")
+		("colinear-gap", boost::program_options::value<long long>(), "When converting an optimal chain of anchors into an alignment path, split the path if the distance between consecutive anchors is greater than this value [default 10000].")
+		// ("mpc-index,i", boost::program_options::value<std::string>(), "minimium path cover index filename")
+		("fast-mode", "(Development purposes) Skip edit distance computation after chaining (output the path instead of alignment)")
+	;
+
 	boost::program_options::options_description general("General parameters");
 	general.add_options()
 		("help,h", "help message")
@@ -47,6 +55,10 @@ int main(int argc, char** argv)
 		("threads,t", boost::program_options::value<size_t>(), "number of threads (int) (default 1)")
 		("verbose", "print progress messages")
 		("short-verbose", "print shorter progress messages")
+	;
+
+	boost::program_options::options_description generalGA("General parameters from GraphAligner");
+	general.add_options()
 		("E-cutoff", boost::program_options::value<double>(), "discard alignments with E-value > arg")
 		("all-alignments", "return all alignments instead of the best non-overlapping alignments")
 		("extra-heuristic", "use heuristics to discard more seed hits")
@@ -60,7 +72,8 @@ int main(int argc, char** argv)
 		("generate-path-seed", boost::program_options::value<long long>(), "seed for generating path")
 		("graph-statistics", "show statistics (size, width) of the input graph then exit")
 	;
-	boost::program_options::options_description seeding("Seeding");
+
+	boost::program_options::options_description seeding("Seeding parameters from GraphAligner");
 	seeding.add_options()
 		("seeds-clustersize", boost::program_options::value<size_t>(), "discard seed clusters with fewer than arg seeds (int)")
 		("seeds-extend-density", boost::program_options::value<double>(), "extend up to approximately the best (arg * sequence length) seeds (double) (-1 for all)")
@@ -75,15 +88,8 @@ int main(int argc, char** argv)
 		("seeds-file,s", boost::program_options::value<std::vector<std::string>>()->multitoken(), "external seeds (.gam)")
 		("seedless-DP", "no seeding, instead use DP alignment algorithm for the entire first row. VERY SLOW except on tiny graphs")
 		("DP-restart-stride", boost::program_options::value<size_t>(), "if --seedless-DP doesn't span the entire read, restart after arg base pairs (int)")
-		("no-colinear-chaining", "do not use co-linear chaining to cluster seeds; this is for benchmarking purposes, if you don't want colinear chaining, use GraphAligner directly")
-		("colinear-gap", boost::program_options::value<long long>(), "max gap distance between adjacent anchors (default 10000)")
-		("colinear-split-len", boost::program_options::value<long long>(), "splited short read lengths [default 35]")
-		("colinear-split-gap", boost::program_options::value<long long>(), "splited short read gaps [default 35]")
-		("speed", boost::program_options::value<long long>(), "Speed-up factor [default 1]; use 3 for faster, but slightly less accurate alignments")
-		("mpc-index,i", boost::program_options::value<std::string>(), "minimium path cover index filename")
-		("fast-mode", "skip edit distance computation after chaining (output the path instead of alignment)")
 	;
-	boost::program_options::options_description alignment("Extension");
+	boost::program_options::options_description alignment("Extension parameters from GraphAligner");
 	alignment.add_options()
 		("bandwidth,b", boost::program_options::value<size_t>(), "alignment bandwidth (int)")
 		("ramp-bandwidth,B", boost::program_options::value<size_t>(), "ramp bandwidth (int)")
@@ -102,7 +108,7 @@ int main(int argc, char** argv)
 	;
 
 	boost::program_options::options_description cmdline_options;
-	cmdline_options.add(mandatory).add(general).add(seeding).add(alignment).add(hidden);
+	cmdline_options.add(mandatory).add(clcparams).add(general).add(generalGA).add(seeding).add(alignment).add(hidden);
 
 	boost::program_options::variables_map vm;
 	try
@@ -188,8 +194,6 @@ int main(int argc, char** argv)
 	if (vm.count("fast-mode"))
 		params.fastMode = true;
 	
-	if (vm.count("no-colinear-chaining")) params.colinearChaining = false;
-	
 	if (params.colinearChaining)
 	{
 		params.alignmentSelectionMethod = AlignmentSelection::SelectionMethod::All;
@@ -202,8 +206,6 @@ int main(int argc, char** argv)
 	if (vm.count("graph")) params.graphFile = vm["graph"].as<std::string>();
 	if (vm.count("reads")) params.fastqFiles = vm["reads"].as<std::vector<std::string>>();
 	if (vm.count("alignments-out")) outputAlns = vm["alignments-out"].as<std::vector<std::string>>();
-	if (vm.count("corrected-out")) params.outputCorrectedFile = vm["corrected-out"].as<std::string>();
-	if (vm.count("corrected-clipped-out")) params.outputCorrectedClippedFile = vm["corrected-clipped-out"].as<std::string>();
 	if (vm.count("threads")) params.numThreads = vm["threads"].as<size_t>();
 	if (vm.count("bandwidth")) params.initialBandwidth = vm["bandwidth"].as<size_t>();
 
