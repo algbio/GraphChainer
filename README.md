@@ -30,4 +30,4 @@ Parameters related to colinear chaining:
 
 ### Credits
 
-GraphChainer is built on the excellent code base of [GraphAligner](https://github.com/maickrau/GraphAligner), which is released under [MIT License](https://github.com/maickrau/GraphAligner/blob/master/LICENSE.md). GraphAligner is described in the paper [GraphAligner: Rapid and Versatile Sequence-to-Graph Alignment](GraphAligner: rapid and versatile sequence-to-graph alignment) by Mikko Rautiainen and Tobias Marschall.
+GraphChainer is built on the excellent code base of [GraphAligner](https://github.com/maickrau/GraphAligner), which is released under [MIT License](https://github.com/maickrau/GraphAligner/blob/master/LICENSE.md). GraphAligner is described in the paper [GraphAligner: Rapid and Versatile Sequence-to-Graph Alignment](https://doi.org/10.1186/s13059-020-02157-2) by Mikko Rautiainen and Tobias Marschall.
