@@ -125,7 +125,7 @@ int main(int argc, char** argv)
 
 	if (vm.count("help"))
 	{
-		std::cerr << mandatory << std::endl << clcparams << std::endl << general << generalGA << std::endl <<std::endl << seeding << std::endl << alignment << std::endl;
+		std::cerr << mandatory << std::endl << clcparams << std::endl << general << std::endl << generalGA << std::endl << seeding << std::endl << alignment << std::endl;
 		std::exit(0);
 	}
 	if (vm.count("version"))
