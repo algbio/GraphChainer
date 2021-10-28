@@ -40,13 +40,6 @@ int main(int argc, char** argv)
 		("corrected-out", boost::program_options::value<std::string>(), "output corrected reads file (.fa/.fa.gz)")
 		("corrected-clipped-out", boost::program_options::value<std::string>(), "output corrected clipped reads file (.fa/.fa.gz)")
 	;
-	boost::program_options::options_description presets("Preset parameters");
-	presets.add_options()
-		("preset,x", boost::program_options::value<std::string>(), 
-			"Preset parameters\n"
-			"dbg - Parameters optimized for de Bruijn graphs\n"
-			"vg - Parameters optimized for variation graphs")
-	;
 	boost::program_options::options_description general("General parameters");
 	general.add_options()
 		("help,h", "help message")
@@ -184,36 +177,14 @@ int main(int argc, char** argv)
 	std::vector<std::string> outputAlns;
 	bool paramError = false;
 
-	if (vm.count("preset"))
-	{
-		std::string preset = vm["preset"].as<std::string>();
-		if (preset == "dbg")
-		{
-			params.minimizerSeedDensity = 5;
-			params.minimizerLength = 19;
-			params.minimizerWindowSize = 30;
-			params.seedExtendDensity = 0.002;
-			params.nondeterministicOptimizations = true;
-			params.initialBandwidth = 5;
-			params.rampBandwidth = 10;
-			params.maxCellsPerSlice = 10000;
-		}
-		else if (preset == "vg")
-		{
-			params.minimizerSeedDensity = 10;
-			params.minimizerLength = 15;
-			params.minimizerWindowSize = 20;
-			params.seedExtendDensity = -1;
-			params.minimizerDiscardMostNumerousFraction = 0.001;
-			params.nondeterministicOptimizations = false;
-			params.initialBandwidth = 10;
-		}
-		else
-		{
-			std::cerr << "unknown preset \"" << preset << "\"" << std::endl;
-			paramError = true;
-		}
-	}
+	// Using GraphAligner's vg preset:
+	params.minimizerSeedDensity = 10;
+	params.minimizerLength = 15;
+	params.minimizerWindowSize = 20;
+	params.seedExtendDensity = -1;
+	params.minimizerDiscardMostNumerousFraction = 0.001;
+	params.nondeterministicOptimizations = false;
+	params.initialBandwidth = 10;
 
 	if (vm.count("fast-mode"))
 		params.fastMode = true;
