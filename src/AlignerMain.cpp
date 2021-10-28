@@ -120,7 +120,6 @@ int main(int argc, char** argv)
 	if (vm.count("help"))
 	{
 		std::cerr << mandatory << std::endl << general << std::endl << seeding << std::endl << alignment << std::endl;
-		std::cerr << presets << std::endl;
 		std::exit(0);
 	}
 	if (vm.count("version"))
@@ -177,7 +176,7 @@ int main(int argc, char** argv)
 	std::vector<std::string> outputAlns;
 	bool paramError = false;
 
-	// Using GraphAligner's vg preset:
+	// Using GraphAligner's vg presets:
 	params.minimizerSeedDensity = 10;
 	params.minimizerLength = 15;
 	params.minimizerWindowSize = 20;
