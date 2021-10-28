@@ -528,7 +528,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 		size_t clustertimems = 0;
 		bool cont = false;
 		// auto align_fn = [&seeder, &alignments, &reusableState, &alntimems, &clustertimems, &stats, &coutoutput, &cerroutput, &error, &params, &alignmentGraph] (const std::string &seq_id, const std::string &sequence) {
-		auto align_fn = [&] (const std::string &seq_id, const std::string &sequence, const bool &tryAllSeeds) {
+		auto align_fn = [&] (const std::string &seq_id, const std::string &sequence) {
 			AlignmentResult alignments;
 			try
 			{
@@ -562,7 +562,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 						clustertimems = std::chrono::duration_cast<std::chrono::milliseconds>(clusterTimeEnd - clusterTimeStart).count();
 						coutoutput << "Read " << seq_id << " clustering took " << clustertimems << "ms" << BufferedWriter::Flush;
 						auto alntimeStart = std::chrono::system_clock::now();
-						alignments = AlignOneWay(alignmentGraph, seq_id, sequence, params.initialBandwidth, params.rampBandwidth, params.maxCellsPerSlice, !params.verboseMode, tryAllSeeds, seeds, reusableState, !params.highMemory, params.forceGlobal, params.preciseClipping, params.seedClusterMinSize, params.seedExtendDensity, params.nondeterministicOptimizations, params.preciseClippingIdentityCutoff, params.Xdropcutoff);
+						alignments = AlignOneWay(alignmentGraph, seq_id, sequence, params.initialBandwidth, params.rampBandwidth, params.maxCellsPerSlice, !params.verboseMode, true /* do not try all seeds! */, seeds, reusableState, !params.highMemory, params.forceGlobal, params.preciseClipping, params.seedClusterMinSize, params.seedExtendDensity, params.nondeterministicOptimizations, params.preciseClippingIdentityCutoff, params.Xdropcutoff);
 						auto alntimeEnd = std::chrono::system_clock::now();
 						alntimems = std::chrono::duration_cast<std::chrono::milliseconds>(alntimeEnd - alntimeStart).count();
 					}
@@ -594,7 +594,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 		};
 		
 		if (!params.colinearChaining) {
-			alignments = align_fn(fastq->seq_id, fastq->sequence, params.tryAllSeeds);
+			alignments = align_fn(fastq->seq_id, fastq->sequence);
 			if (cont)
 				continue;
 		}
@@ -631,7 +631,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 			AlignmentResult long_alignments;
 			size_t long_edit_distance;
 			cerroutput << "Trying to align long read" << fastq->seq_id;
-			long_alignments = align_fn(fastq->seq_id, fastq->sequence, false);
+			long_alignments = align_fn(fastq->seq_id, fastq->sequence);
 			cerroutput << " Aligned long read" << fastq->seq_id;
 
 			// Getting the best alignment of GA
@@ -909,7 +909,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 					cerroutput << tmpidx << " " << short_id << " len=" << fastq->sequence.length() << " : "
 					<< "chained " << ids.size() << " / " << A.size() << " anchors, actual " << longest.size() << " bps, "
 					<< "time " << anchorsms << " " << clcms << " " << connectms << "  "
-					<< "score=" << alnScore << " better? " << (better?"Yes":"No") 
+					<< "score=" << alnScore //<< " better? " << (better?"Yes":"No") 
 					<< " long_edit_distance=" << long_edit_distance
 					<< " one_node_overlaps=" << one_node_overlaps_now << " / " << one_node_overlaps_all
 					<< BufferedWriter::Flush;
