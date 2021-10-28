@@ -681,7 +681,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 					std::string name = short_id + "_" + std::to_string(l) + "_" + std::to_string(l + len - 1);
 					try {
 						// for (size_t k = sl; k < sr; k++)
-							cerroutput << k << " : " << seeds[k].seqPos << BufferedWriter::Flush;
+							// cerroutput << k << " : " << seeds[k].seqPos << BufferedWriter::Flush;
 						// std::vector<SeedHit> tmp_seeds;
 						// for (size_t k = sl; k < sr; k++) {
 						// 	tmp_seeds.push_back(seeds[k]);
