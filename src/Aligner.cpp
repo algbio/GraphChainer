@@ -630,7 +630,9 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 			bool necessary = true;
 			AlignmentResult long_alignments;
 			size_t long_edit_distance;
+			cerroutput << "Trying to align long read" << fastq->seq_id << BufferedWriter::Flush;
 			long_alignments = align_fn(fastq->seq_id, fastq->sequence, false);
+			cerroutput << "Aligned long read" << fastq->seq_id << BufferedWriter::Flush;
 
 			// Getting the best alignment of GA
 			AlignmentSelection::SelectionOptions gaSelectionOptions = selectionOptions;
@@ -648,6 +650,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 					long_edit_distance = result.editDistance;
 				}
 				edlibFreeAlignResult(result);
+				cerroutput << " with long_edit_distance" << long_edit_distance << BufferedWriter::Flush;
 			}
 
 			if (necessary) {
@@ -671,14 +674,14 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 						sr++;
 					while (sl < sr && seeds[sl].seqPos < l)
 						sl++;
-					// cerroutput << short_id << " : " << l << " / " << fastq->sequence.length() << " " << sl << " " << sr << BufferedWriter::Flush;
+					cerroutput << short_id << " : " << l << " / " << fastq->sequence.length() << " " << sl << " " << sr << BufferedWriter::Flush;
 					if (sl >= sr)
 						continue;
 					std::string seq = fastq->sequence.substr(l, len);
 					std::string name = short_id + "_" + std::to_string(l) + "_" + std::to_string(l + len - 1);
 					try {
 						// for (size_t k = sl; k < sr; k++)
-						// 	cerroutput << k << " : " << seeds[k].seqPos << BufferedWriter::Flush;
+							cerroutput << k << " : " << seeds[k].seqPos << BufferedWriter::Flush;
 						// std::vector<SeedHit> tmp_seeds;
 						// for (size_t k = sl; k < sr; k++) {
 						// 	tmp_seeds.push_back(seeds[k]);
@@ -727,7 +730,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 				}
 				auto anchorsEnd = std::chrono::system_clock::now();
 				auto anchorsms = std::chrono::duration_cast<std::chrono::milliseconds>(anchorsEnd - anchorsStart).count();
-				// cerroutput << short_id << " : chaining " << A.size() << " anchors" << BufferedWriter::Flush;
+				cerroutput << short_id << " : chaining " << A.size() << " anchors" << BufferedWriter::Flush;
 				auto clcStart = std::chrono::system_clock::now();
 				std::vector<size_t> ids = alignmentGraph.colinearChaining(A, params.colinearGap);
 				auto clcEnd = std::chrono::system_clock::now();
@@ -740,7 +743,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 				size_t firstNodeOffset, lastNodeOffset;
 				auto connectStart = std::chrono::system_clock::now();
 				int ai_idx = 0;
-				// cerroutput << short_id << " : chaining " << ids.size() << " / " << A.size() << " anchors" << BufferedWriter::Flush;
+				cerroutput << short_id << " : chaining " << ids.size() << " / " << A.size() << " anchors" << BufferedWriter::Flush;
 				int one_node_overlaps_tmp = 0, one_node_overlaps_now = 0, one_node_overlaps_all = 0;
 				for (size_t ai : ids) {
 					for (size_t j =0 ; j<Apos[ai].size();j++) {
@@ -822,7 +825,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 				std::string pathseq = "";
 				// not convert back to original node ids, to call alignmentGraph.NodeSequences()
 				for (AlignmentGraph::MatrixPosition &p : longest) {
-				// cerroutput << p.node << " : " << p.nodeOffset << " bps " << alignmentGraph.NodeLength(p.node) << BufferedWriter::Flush;
+				cerroutput << p.node << " : " << p.nodeOffset << " bps " << alignmentGraph.NodeLength(p.node) << BufferedWriter::Flush;
 
 					pathseq.push_back(alignmentGraph.NodeSequences(p.node, p.nodeOffset));
 				}
@@ -868,7 +871,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 							pos_i = std::min(pos_i, longest.size() - 1);
 							
 						}
-						// cerroutput << "eds " << trace.size() << " " << longest.size() << " : " << pos_i << " / " << seq_i << BufferedWriter::Flush;;
+						cerroutput << "eds " << trace.size() << " " << longest.size() << " : " << pos_i << " / " << seq_i << BufferedWriter::Flush;;
 						longest.swap(trace);
 					}
 					edlibFreeAlignResult(result);
@@ -894,13 +897,15 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 				}
 				auto connectEnd = std::chrono::system_clock::now();
 				auto connectms = std::chrono::duration_cast<std::chrono::milliseconds>(connectEnd - connectStart).count();
-				bool better = (long_alignments.alignments.empty() || long_edit_distance > alignments.alignments.back().alignmentScore);
+
+				if (alignments.alignments.size() > 0) alignments.alignments = AlignmentSelection::SelectAlignments(alignments.alignments, selectionOptions);
+				bool better = (long_alignments.alignments.empty() || long_edit_distance > alignments.alignments.front().alignmentScore);
 
 				if (params.shortVerboseMode || params.verboseMode)
 					cerroutput << tmpidx << " " << short_id << " len=" << fastq->sequence.length() << " : "
 					<< "chained " << ids.size() << " / " << A.size() << " anchors, actual " << longest.size() << " bps, "
 					<< "time " << anchorsms << " " << clcms << " " << connectms << "  "
-					<< "score=" << alnScore// << " better? " << (better?"Yes":"No") 
+					<< "score=" << alnScore << " better? " << (better?"Yes":"No") 
 					<< " long_edit_distance=" << long_edit_distance
 					<< " one_node_overlaps=" << one_node_overlaps_now << " / " << one_node_overlaps_all
 					<< BufferedWriter::Flush;
@@ -915,7 +920,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, moodycamel::Conc
 		stats.allAlignmentsCount += alignments.alignments.size();
 
 		coutoutput << "Read " << fastq->seq_id << " alignment took " << alntimems << "ms" << BufferedWriter::Flush;
-		if (alignments.alignments.size() > 0) alignments.alignments = AlignmentSelection::SelectAlignments(alignments.alignments, selectionOptions);
+		//if (alignments.alignments.size() > 0) alignments.alignments = AlignmentSelection::SelectAlignments(alignments.alignments, selectionOptions);
 
 		// for (size_t i = 0; i < alignments.alignments.size(); i++) {
 		// 	// c++ helloWorld.cpp edlib/src/edlib.cpp -o helloWorld -I edlib/include.
