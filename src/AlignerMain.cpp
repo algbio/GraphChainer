@@ -82,7 +82,7 @@ int main(int argc, char** argv)
 		("seeds-file,s", boost::program_options::value<std::vector<std::string>>()->multitoken(), "external seeds (.gam)")
 		("seedless-DP", "no seeding, instead use DP alignment algorithm for the entire first row. VERY SLOW except on tiny graphs")
 		("DP-restart-stride", boost::program_options::value<size_t>(), "if --seedless-DP doesn't span the entire read, restart after arg base pairs (int)")
-		("no-colinear-chaining", "do not use co-linear chaining to cluster seeds")
+		("no-colinear-chaining", "do not use co-linear chaining to cluster seeds; this is for benchmarking purposes, if you don't want colinear chaining, use GraphAligner directly")
 		("colinear-gap", boost::program_options::value<long long>(), "max gap distance between adjacent anchors (default 10000)")
 		("colinear-split-len", boost::program_options::value<long long>(), "splited short read lengths [default 35]")
 		("colinear-split-gap", boost::program_options::value<long long>(), "splited short read gaps [default 35]")
@@ -218,7 +218,9 @@ int main(int argc, char** argv)
 	if (vm.count("fast-mode"))
 		params.fastMode = true;
 	
-	if (!vm.count("no-colinear-chaining"))
+	if (vm.count("no-colinear-chaining")) params.colinearChaining = false;
+	
+	if (params.colinearChaining)
 	{
 		params.alignmentSelectionMethod = AlignmentSelection::SelectionMethod::All;
 		params.tryAllSeeds = true;
@@ -247,7 +249,7 @@ int main(int argc, char** argv)
 	if (vm.count("seeds-mum-count")) params.mumCount = vm["seeds-mum-count"].as<size_t>();
 	if (vm.count("seeds-mxm-cache-prefix")) params.seederCachePrefix = vm["seeds-mxm-cache-prefix"].as<std::string>();
 	if (vm.count("seedless-DP")) params.dynamicRowStart = true;
-	if (vm.count("no-colinear-chaining")) params.colinearChaining = false;
+	
 	if (vm.count("colinear-gap")) params.colinearGap = vm["colinear-gap"].as<long long>();
 	if (vm.count("colinear-split-len")) params.colinearSplitLen = vm["colinear-split-len"].as<long long>();
 	if (vm.count("colinear-split-gap")) params.colinearSplitGap = vm["colinear-split-gap"].as<long long>();
@@ -256,6 +258,10 @@ int main(int argc, char** argv)
 	
 	if (params.speed != 1)
 	{
+		if (vm.count("colinear-split-gap"))
+		{
+			std::cerr << "WARNING: --speed and --colinear-split-gap are both set! --colinear-split-gap will be ignored, and set to (--speed * --colinear-split-len)" << std::endl;
+		}
 		params.colinearSplitGap = params.speed * params.colinearSplitLen;
 	}
 	
