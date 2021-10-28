@@ -102,7 +102,7 @@ int main(int argc, char** argv)
 	;
 
 	boost::program_options::options_description cmdline_options;
-	cmdline_options.add(mandatory).add(general).add(seeding).add(alignment).add(hidden).add(presets);
+	cmdline_options.add(mandatory).add(general).add(seeding).add(alignment).add(hidden);
 
 	boost::program_options::variables_map vm;
 	try
