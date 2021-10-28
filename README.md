@@ -19,7 +19,7 @@ Quickstart: `./bin/GraphChainer -t 4 -f reads.fastq -g graph.gfa -a out.gam`
 Parameters inherited from GraphAligner:
 - `-t` Number of threads.
 - `-f` Input reads. Format .fasta / .fastq / .fasta.gz / .fastq.gz. You can input multiple files with `-f file1 -f file2 ...` or `-f file1 file2 ...`.
-- `-g` Input graph. Format .gfa / .vg.
+- `-g` Input graph. **This graph must be acyclic** Format .gfa / .vg. 
 - `-a` Output file name. Format .gam or .json.
 
 Parameters related to colinear chaining:
@@ -27,6 +27,12 @@ Parameters related to colinear chaining:
 - `--colinear-split-len <int>` Default 35. The length of the fragments in which the long read is split to create anchors.
 - `--colinear-split-gap <int>` Default 35. The distance between consecutive fragments. If `--speed` is set, then always `--colinear-split-gap = --speed * --colinear-split-len`.
 - `--colinear-gap 1000` Default 10000. When converting an optimal chain of anchors into an alignment path, split the path if the distance between consecutive anchors is greater than this value.
+
+### Constructing an (acyclic) variation graph
+
+Use [vg](https://github.com/vgteam/vg) and run:
+
+`vg construct -t 30 -a -r {ref} -v {vcf} -R 22 -p -m 3000000`
 
 ### Credits
 
