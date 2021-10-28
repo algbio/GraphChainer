@@ -26,7 +26,7 @@ Parameters related to colinear chaining:
 - `--speed <int>` Default 1. Use 2 or 3 (or larger values) if you want GraphChainer to be faster, but sligthly less accurate.
 - `--colinear-split-len <int>` Default 35. The length of the fragments in which the long read is split to create anchors.
 - `--colinear-split-gap <int>` Default 35. The distance between consecutive fragments. If `--speed` is set, then always `--colinear-split-gap = --speed * --colinear-split-len`.
-- `--colinear-gap 1000` Default 10000. When converting an optimal chain of anchors into an alignment path, split the path if the distance between consecutive anchors is greater than this value.
+- `--colinear-gap <int>` Default 10000. When converting an optimal chain of anchors into an alignment path, split the path if the distance between consecutive anchors is greater than this value.
 
 ### Constructing an (acyclic) variation graph
 
