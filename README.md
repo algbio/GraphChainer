@@ -2,11 +2,11 @@
 
 GraphChainer is an accurate aligner of long reads to a variation graph, based on co-linear chaining.
 
-#### Compilation
+### Comopiling
 
 To compile, run these:
 
-- Install miniconda https://conda.io/projects/conda/en/latest/user-guide/install/index.html
+- Install [miniconda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html)
 - `git submodule update --init --recursive`
 - `conda env create -f CondaEnvironment.yml`
 - `conda activate GraphChainer`
