@@ -19,7 +19,7 @@ Quickstart: `./bin/GraphChainer -t 4 -f reads.fastq -g graph.gfa -a out.gam`
 Key parameters:
 - `-t` Number of threads (optional, default 1).
 - `-f` Input reads. Format .fasta / .fastq / .fasta.gz / .fastq.gz. You can input multiple files with `-f file1 -f file2 ...` or `-f file1 file2 ...`.
-- `-g` Input graph. **This graph must be acyclic**. Format .gfa / .vg. 
+- `-g` Input graph, format .gfa / .vg. **This graph must be acyclic**, see below how to construct an acyclic graph with vg.
 - `-a` Output file name. Format .gam or .json.
 
 Parameters related to colinear chaining:
