@@ -105,6 +105,7 @@ int main(int argc, char** argv)
 		("greedy-length", "greedily select a non-overlapping alignment set based on alignment length")
 		("greedy-E", "greedily select a non-overlapping alignment set based on E-value")
 		("greedy-score", "greedily select a non-overlapping alignment set based on alignment score")
+		("no-colinear-chaining", "do not run colinear chaining and align as in GraphAligner, default parameters")
 	;
 
 	boost::program_options::options_description cmdline_options;
@@ -194,6 +195,9 @@ int main(int argc, char** argv)
 	if (vm.count("fast-mode"))
 		params.fastMode = true;
 	
+	if (vm.count("no-colinear-chaining"))
+		params.colinearChaining = false;
+
 	if (params.colinearChaining)
 	{
 		params.alignmentSelectionMethod = AlignmentSelection::SelectionMethod::All;
