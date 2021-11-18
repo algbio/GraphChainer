@@ -38,7 +38,7 @@ Use [vg](https://github.com/vgteam/vg) and run:
 
 If you use GraphChainer, please cite as:
 
-Jun Ma, Manuel Cáceres, Leena Salmela, Veli Mäkinen, Alexandru I. Tomescu. GraphChainer: Co-linear Chaining for Accurate Sequence-to-Variation-Graph Alignment. Submitted, 2021
+Jun Ma, Manuel Cáceres, Leena Salmela, Veli Mäkinen, Alexandru I. Tomescu. GraphChainer: Co-linear Chaining for Accurate Alignment of Long Reads to Variation Graphs. Submitted, 2021
 
 ### Credits
 
