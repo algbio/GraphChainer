@@ -23,7 +23,7 @@ Key parameters:
 - `-a` Output file name. Format .gam or .json.
 
 Parameters related to colinear chaining:
-- `--speed <int>` Use 2 or 3 (or larger values) if you want GraphChainer to be faster, but sligthly less accurate (default 1).
+- `--speed <int>` Use 2 or 3 (or larger values) if you want GraphChainer to be faster, but slightly less accurate (default 1).
 - `--colinear-split-len <int>` The length of the fragments in which the long read is split to create anchors (default 35).
 - `--colinear-split-gap <int>` The distance between consecutive fragments (default 35). If `--speed` is set, then always `--colinear-split-gap = --speed * --colinear-split-len`.
 - `--colinear-gap <int>` When converting an optimal chain of anchors into an alignment path, split the path if the distance in the graph between consecutive anchors is greater than this value (default 10000).
