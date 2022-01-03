@@ -40,7 +40,7 @@ int main(int argc, char** argv)
 	;
 	boost::program_options::options_description clcparams("Colinear chaining parameters");
 	clcparams.add_options()
-		("speed", boost::program_options::value<long long>(), "Speed-up factor [default 1]. Use >1 (<1) for faster (slower), but less (more) accurate alignments. It increases (decreases) the sampling rate of fragments.")
+		("speed", boost::program_options::value<long long>(), "Speed-up factor [default 1]. Use >1 (<1, >0) for faster (slower), but less (more) accurate alignments. It increases (decreases) the sampling rate of fragments.")
 		("colinear-split-len", boost::program_options::value<long long>(), "The length of the fragments in which the long read is split to create anchors. [default 35]")
 		("colinear-split-gap", boost::program_options::value<long long>(), "The distance between consecutive fragments [default 35]. If --speed is set, then always --colinear-split-gap = ceil(--speed * --colinear-split-len).")
 		("colinear-gap", boost::program_options::value<long long>(), "When converting an optimal chain of anchors into an alignment path, split the path if the distance between consecutive anchors is greater than this value [default 10000].")
