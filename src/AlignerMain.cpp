@@ -40,9 +40,9 @@ int main(int argc, char** argv)
 	;
 	boost::program_options::options_description clcparams("Colinear chaining parameters");
 	clcparams.add_options()
-		("speed", boost::program_options::value<long long>(), "Speed-up factor [default 1]. Use 2 or 3 for faster, but slightly less accurate alignments")
+		("speed", boost::program_options::value<long long>(), "Speed-up factor [default 1]. Use >1 (<1, >0) for faster (slower), but less (more) accurate alignments. It increases (decreases) the sampling rate of fragments.")
 		("colinear-split-len", boost::program_options::value<long long>(), "The length of the fragments in which the long read is split to create anchors. [default 35]")
-		("colinear-split-gap", boost::program_options::value<long long>(), "The distance between consecutive fragments [default 35]. If --speed is set, then always --colinear-split-gap = --speed * --colinear-split-len.")
+		("colinear-split-gap", boost::program_options::value<long long>(), "The distance between consecutive fragments [default 35]. If --speed is set, then always --colinear-split-gap = ceil(--speed * --colinear-split-len).")
 		("colinear-gap", boost::program_options::value<long long>(), "When converting an optimal chain of anchors into an alignment path, split the path if the distance between consecutive anchors is greater than this value [default 10000].")
 		// ("mpc-index,i", boost::program_options::value<std::string>(), "minimium path cover index filename")
 		("fast-mode", "(Development purposes) Skip edit distance computation after chaining (output the path instead of alignment)")
@@ -205,6 +205,7 @@ int main(int argc, char** argv)
 		params.colinearGap = 10000;
 		params.colinearSplitLen = 35;
 		params.colinearSplitGap = 35;
+        params.speed = 1;
 	}
 
 	if (vm.count("graph")) params.graphFile = vm["graph"].as<std::string>();
@@ -238,7 +239,7 @@ int main(int argc, char** argv)
 		{
 			std::cerr << "WARNING: --speed and --colinear-split-gap are both set! --colinear-split-gap will be ignored, and set to (--speed * --colinear-split-len)" << std::endl;
 		}
-		params.colinearSplitGap = params.speed * params.colinearSplitLen;
+		params.colinearSplitGap = ceil(params.speed * params.colinearSplitLen);
 	}
 	
 	if (vm.count("DP-restart-stride")) params.DPRestartStride = vm["DP-restart-stride"].as<size_t>();
