@@ -1507,8 +1507,12 @@ std::vector<size_t> AlignmentGraph::generatePath(const std::string &seq_out, con
 	}
 	std::ofstream fout(seq_out), pout(path_out);
 	fout << ">path_" << path[0] << "_" << path.back() << std::endl;
-	for (size_t i : path) {
-		pout << i << ' ' << nodeIDs[i] << std::endl;
+	int last_nodeID = -1; // Assumed not to be a valid ID
+        for (size_t i : path) {
+		if (nodeIDs[i] != last_nodeID) {
+                	pout << i << ' ' << nodeIDs[i] << std::endl;
+                       	last_nodeID = nodeIDs[i];
+		}
 		// std::cout << i << " " << nodeIDs[i] << " " << reverse[i] << " : ";
 		for (size_t j = 0; j < NodeLength(i); j++) {
 			fout << NodeSequences(i, j);
