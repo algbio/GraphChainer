@@ -1295,6 +1295,11 @@ std::vector<std::vector<size_t>> AlignmentGraph::greedyCover(size_t cid) const {
 					Q[Qsize++] = t;
 			}
 		}
+        if (Qsize < N) {
+            std::cout << "The input sequence graph has a directed cycle." <<  std::endl <<
+            "The current version of GraphChainer only supports DAGs." << std::endl;
+            exit(0);
+        }
 		std::vector<size_t> tmp, path;
 		for (size_t i = best.second; d[i].second != i || i != tmp.back(); i = d[i].second)
 			tmp.push_back(i);
