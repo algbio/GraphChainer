@@ -2,7 +2,7 @@
 
 GraphChainer is an accurate aligner of long reads to a variation graph, based on co-linear chaining.
 
-### Comopiling
+### Compiling
 
 To compile, run these:
 
@@ -34,11 +34,15 @@ Use [vg](https://github.com/vgteam/vg) and run:
 
 `vg construct -t 30 -a -r {ref} -v {vcf} -R 22 -p -m 3000000`
 
+### Datasets availability
+
+The chromosome graphs built for the experiments of GraphChainer can be found in Zenodo at [https://doi.org/10.5281/zenodo.6587252](https://doi.org/10.5281/zenodo.6587252)
+
 ### Citation
 
 If you use GraphChainer, please cite as:
 
-Jun Ma, Manuel Cáceres, Leena Salmela, Veli Mäkinen, Alexandru I. Tomescu. GraphChainer: Co-linear Chaining for Accurate Alignment of Long Reads to Variation Graphs. Submitted, 2021
+Jun Ma, Manuel Cáceres, Leena Salmela, Veli Mäkinen, Alexandru I. Tomescu. Chaining for Accurate Alignment of Erroneous Long Reads to Acyclic Variation Graphs. Submitted, 2022
 
 ### Credits
 
