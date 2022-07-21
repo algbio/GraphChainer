@@ -36,7 +36,7 @@ Use [vg](https://github.com/vgteam/vg) and run:
 
 ### Datasets availability
 
-The chromosome graphs built for the experiments of GraphChainer can be found in Zenodo at [https://doi.org/10.5281/zenodo.6587252](https://doi.org/10.5281/zenodo.6587252)
+The chromosome graphs built for the experiments of GraphChainer can be found in Zenodo at [https://doi.org/10.5281/zenodo.6875064](https://doi.org/10.5281/zenodo.6875064) and at [https://doi.org/10.5281/zenodo.6587252](https://doi.org/10.5281/zenodo.6587252)
 
 ### Citation
 
