@@ -57,7 +57,7 @@ struct AlignerParams
 	long long colinearGap;
 	long long colinearSplitLen;
 	long long colinearSplitGap;
-	double speed;
+	double samplingStep;
 	bool fastMode;
 	
 };
