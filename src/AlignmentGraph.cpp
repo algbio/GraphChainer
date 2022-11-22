@@ -1301,8 +1301,12 @@ std::vector<std::vector<size_t>> AlignmentGraph::greedyCover(size_t cid) const {
             exit(0);
         }
 		std::vector<size_t> tmp, path;
-		for (size_t i = best.second; d[i].second != i || i != tmp.back(); i = d[i].second)
-			tmp.push_back(i);
+        if (best.second == d[best.second].second) {
+            tmp.push_back(best.second);
+        } else {
+            for (size_t i = best.second; d[i].second != i || i != tmp.back(); i = d[i].second)
+                tmp.push_back(i);
+        }
 		std::reverse(tmp.begin(), tmp.end());
 		size_t l = 0, r = tmp.size() - 1;
 		while (covered[tmp[l]]) l++;
