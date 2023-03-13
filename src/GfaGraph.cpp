@@ -321,10 +321,11 @@ GfaGraph GfaGraph::LoadFromStream(std::istream& file, bool allowVaryingOverlaps,
 		}
 	}
 	// todo: similar check when constant overlaps are used
+        /* Do not change the original names
 	if (allIdsIntegers)
 	{
 		result.numberBackToIntegers();
-	}
+	} */
 	std::vector<NodePos> nonexistantEdges;
 	bool hasNonexistant = false;
 	for (auto& edge : result.edges)
