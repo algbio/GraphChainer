@@ -1519,7 +1519,11 @@ std::vector<size_t> AlignmentGraph::generatePath(const std::string &seq_out, con
 	int last_nodeID = -1; // Assumed not to be a valid ID
         for (size_t i : path) {
 		if (nodeIDs[i] != last_nodeID) {
-                	pout << i << ' ' << nodeIDs[i] << std::endl;
+                        if (OriginalNodeName(nodeIDs[i]).length() == 0) {
+                                pout << i << ' ' << nodeIDs[i] << std::endl;
+                        } else {
+                                pout << i << ' ' << OriginalNodeName(nodeIDs[i]) << std::endl;
+                        }
                        	last_nodeID = nodeIDs[i];
 		}
 		// std::cout << i << " " << nodeIDs[i] << " " << reverse[i] << " : ";
