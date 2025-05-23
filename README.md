@@ -48,7 +48,7 @@ The evaluation pipeline used in the paper can be found at [https://github.com/al
 
 If you use GraphChainer, please cite as:
 
-Jun Ma, Manuel Cáceres, Leena Salmela, Veli Mäkinen, Alexandru I. Tomescu. Chaining for Accurate Alignment of Erroneous Long Reads to Acyclic Variation Graphs. Submitted, 2022
+Jun Ma, Manuel Cáceres, Leena Salmela, Veli Mäkinen, Alexandru I. Tomescu. Chaining for accurate alignment of erroneous long reads to acyclic variation graphs. Bioinformatics, 2023, 39(8), btad460 [https://doi.org/10.1093/bioinformatics/btad460](https://doi.org/10.1093/bioinformatics/btad460).
 
 ### Credits
 
